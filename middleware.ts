@@ -10,7 +10,7 @@ const isPublicRoute = createRouteMatcher([
 
 const isAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 
-export const proxy = clerkMiddleware(async (auth, request) => {
+export default clerkMiddleware(async (auth, request) => {
   const { userId } = await auth();
 
   // Redirect signed-in users away from sign-in/sign-up pages to dashboard
