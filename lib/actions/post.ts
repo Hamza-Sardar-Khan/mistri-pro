@@ -99,14 +99,14 @@ export async function deleteComment(postId: string, commentId: string) {
   const post = await Post.findById(postId);
   if (!post) throw new Error("Post not found");
 
-  const comment = post.comments.id(commentId);
+  const comment = (post.comments as any).id(commentId);
   if (!comment) throw new Error("Comment not found");
 
   if (comment.clerkUserId !== user.id) {
     throw new Error("Forbidden: you can only delete your own comments");
   }
 
-  post.comments.pull({ _id: commentId });
+  (post.comments as any).pull({ _id: commentId });
   await post.save();
   revalidatePath("/dashboard");
 }
@@ -148,7 +148,7 @@ export async function toggleCommentLike(postId: string, commentId: string) {
   const post = await Post.findById(postId);
   if (!post) throw new Error("Post not found");
 
-  const comment = post.comments.id(commentId);
+  const comment = (post.comments as any).id(commentId);
   if (!comment) throw new Error("Comment not found");
 
   if (!comment.likes) comment.likes = [];
@@ -173,7 +173,7 @@ export async function addReply(postId: string, commentId: string, text: string) 
   const post = await Post.findById(postId);
   if (!post) throw new Error("Post not found");
 
-  const comment = post.comments.id(commentId);
+  const comment = (post.comments as any).id(commentId);
   if (!comment) throw new Error("Comment not found");
 
   if (!comment.replies) comment.replies = [] as any;
@@ -203,12 +203,12 @@ export async function toggleReplyLike(postId: string, commentId: string, replyId
   const post = await Post.findById(postId);
   if (!post) throw new Error("Post not found");
 
-  const comment = post.comments.id(commentId);
+  const comment = (post.comments as any).id(commentId);
   if (!comment) throw new Error("Comment not found");
 
   if (!comment.replies) comment.replies = [] as any;
 
-  const reply = comment.replies.id(replyId);
+  const reply = (comment.replies as any).id(replyId);
   if (!reply) throw new Error("Reply not found");
 
   if (!reply.likes) reply.likes = [];
