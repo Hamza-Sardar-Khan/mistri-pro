@@ -1,6 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+#Add the env line if we dont want to commit env files, but we can opt-in if needed
+
 /node_modules
 /.pnp
 .pnp.*
@@ -23,6 +25,10 @@
 # misc
 .DS_Store
 *.pem
+
+# env files
+.env*
+.env.local
 
 # debug
 npm-debug.log*
