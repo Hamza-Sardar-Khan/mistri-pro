@@ -1,63 +1,39 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { syncUser } from "@/lib/actions/user";
+import { syncAndCheckProfile } from "@/lib/actions/user";
 import { getPosts } from "@/lib/actions/post";
-import { SignOutButton } from "@clerk/nextjs";
 import CreatePostPrompt from "@/components/CreatePostPrompt";
 import PostCard from "@/components/PostCard";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const user = await currentUser();
+  // Single call: sync user + check profile completion
+  const result = await syncAndCheckProfile();
+  if (!result) redirect("/");
+  if (!result.profileComplete) redirect("/profile-setup");
+
+  const [user, posts] = await Promise.all([currentUser(), getPosts()]);
   if (!user) redirect("/");
-
-  // Sync user to MongoDB on first visit
-  await syncUser();
-
-  // Fetch posts
-  const posts = await getPosts();
   const userName =
     `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Anonymous";
 
   return (
     <div className="min-h-screen bg-[#f5f7fa]">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 border-b border-gray-200 bg-white shadow-sm">
-        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-4">
-          <h1 className="text-xl font-extrabold tracking-tight">
-            <span className="text-[#0e1724]">MISTRI</span>{" "}
-            <span className="text-[#0d7cf2]">PRO</span>
-          </h1>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              {user.imageUrl ? (
-                <img
-                  src={user.imageUrl}
-                  alt="avatar"
-                  className="h-8 w-8 rounded-full object-cover ring-2 ring-[#0d7cf2]/30"
-                />
-              ) : (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0d7cf2] text-xs font-bold text-white">
-                  {userName.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="hidden text-sm font-medium text-[#0e1724] sm:inline">
-                {userName}
-              </span>
-            </div>
-            <SignOutButton>
-              <button className="rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-[#5e6d80] transition hover:bg-gray-50">
-                Log Out
-              </button>
-            </SignOutButton>
-          </div>
-        </div>
-      </header>
-
       {/* Feed */}
       <main className="mx-auto max-w-2xl px-4 py-6">
+        {/* Mobile post project button */}
+        <Link
+          href="/projects/post"
+          className="mb-4 flex sm:hidden items-center justify-center gap-2 rounded-xl border border-[#0d7cf2] bg-[#0d7cf2]/5 px-4 py-3 text-sm font-semibold text-[#0d7cf2] transition hover:bg-[#0d7cf2]/10"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Post a Project
+        </Link>
+
         {/* Create post prompt */}
         <CreatePostPrompt
           userAvatar={user.imageUrl ?? ""}

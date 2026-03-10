@@ -24,16 +24,21 @@ export async function POST(req: NextRequest) {
     const dataUri = `data:${mime};base64,${base64}`;
 
     // Determine resource type
-    const resourceType = mime.startsWith("video") ? "video" : "image";
+    let resourceType: "image" | "video" | "raw" = "image";
+    if (mime.startsWith("video")) resourceType = "video";
+    else if (mime.startsWith("audio")) resourceType = "video"; // Cloudinary handles audio under "video"
 
     const result = await cloudinary.uploader.upload(dataUri, {
       folder: "mistri-pro",
       resource_type: resourceType,
     });
 
+    // Return a normalized type for the client
+    const clientType = mime.startsWith("audio") ? "audio" : mime.startsWith("video") ? "video" : "image";
+
     return NextResponse.json({
       url: result.secure_url,
-      type: resourceType,
+      type: clientType,
     });
   } catch (error: unknown) {
     console.error("Cloudinary upload error:", error);

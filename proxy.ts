@@ -13,9 +13,9 @@ const isAuthRoute = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 export default clerkMiddleware(async (auth, request) => {
   const { userId } = await auth();
 
-  // Redirect signed-in users away from sign-in/sign-up pages to dashboard
+  // Redirect signed-in users away from sign-in/sign-up pages
   if (userId && isAuthRoute(request)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/profile-setup", request.url));
   }
 
   if (!isPublicRoute(request)) {

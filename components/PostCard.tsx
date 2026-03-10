@@ -481,7 +481,7 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
       {/* Author header */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-2">
         {post.authorAvatar ? (
-          <img src={post.authorAvatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+          <img src={post.authorAvatar} alt="" loading="lazy" decoding="async" className="h-10 w-10 rounded-full object-cover" />
         ) : (
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d7cf2] text-sm font-bold text-white">
             {post.authorName.charAt(0).toUpperCase()}
@@ -523,13 +523,13 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
       {/* Media */}
       {post.imageUrl && (
         <div className="px-5 pb-2">
-          <img src={post.imageUrl} alt="post image" className="w-full rounded-lg object-cover" />
+          <img src={post.imageUrl} alt="post image" loading="lazy" decoding="async" className="w-full rounded-lg object-cover" />
         </div>
       )}
       {post.videoUrl && (
         <div className="px-5 pb-2">
           <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "16/9" }}>
-            <video src={post.videoUrl} controls className="absolute inset-0 h-full w-full object-contain" />
+            <video src={post.videoUrl} controls preload="none" className="absolute inset-0 h-full w-full object-contain" />
           </div>
         </div>
       )}
