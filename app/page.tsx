@@ -37,7 +37,7 @@ export default async function LandingPage() {
             </button>
           </SignInButton>
 
-          <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+          <SignUpButton mode="modal" forceRedirectUrl="/profile-setup">
             <button className="w-48 cursor-pointer rounded-md bg-[#0d7cf2] px-8 py-3 text-lg font-semibold text-white shadow-sm transition hover:bg-[#0b6ad4]">
               Sign Up
             </button>
