@@ -9,7 +9,7 @@ interface Props {
   params: Promise<{ clerkUserId: string }>;
 }
 
-export default async function PublicProfilePage({ params }: Props) {
+export default async function Page({ params }: Props) {
   const { clerkUserId } = await params;
   const user = await currentUser();
   if (!user) redirect("/");

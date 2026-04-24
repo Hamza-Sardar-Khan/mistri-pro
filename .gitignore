@@ -52,3 +52,6 @@ next-env.d.ts
 
 # igonore the project proposal pdf
 Mistri-Pro.pdf
+
+# ignore the docs folder
+/docs/
