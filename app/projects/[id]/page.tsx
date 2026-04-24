@@ -148,7 +148,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
 
         {/* Proposals section */}
-        <ProposalsList proposals={proposals} isOwner={isOwner} currentUserId={user.id} />
+        <ProposalsList projectId={id} proposals={proposals} isOwner={isOwner} currentUserId={user.id} />
       </main>
     </div>
   );

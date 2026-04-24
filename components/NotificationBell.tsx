@@ -4,14 +4,17 @@ import { useEffect, useState, useCallback } from "react";
 import { getPusherClient } from "@/lib/pusher-client";
 import Link from "next/link";
 
+type NotificationType = "new-project" | "new-bid" | "new-message";
+
 interface Notification {
   id: string;
-  projectId: string;
+  type: NotificationType;
   title: string;
-  clientName: string;
-  budgetType: string;
-  budgetAmount: number;
-  skills: string[];
+  body: string;
+  href: string;
+  projectId?: string;
+  actorName?: string;
+  skills?: string[];
   createdAt: string;
 }
 
@@ -27,6 +30,13 @@ export default function NotificationBell({ userSkills, currentUserId }: Props) {
 
   const unreadCount = notifications.length - seenCount;
 
+  const addNotification = useCallback((notification: Notification) => {
+    setNotifications((prev) => {
+      if (prev.some((item) => item.id === notification.id)) return prev;
+      return [notification, ...prev].slice(0, 30);
+    });
+  }, []);
+
   const handleNewProject = useCallback((data: {
     _id: string;
     title: string;
@@ -37,25 +47,24 @@ export default function NotificationBell({ userSkills, currentUserId }: Props) {
     skills: string[];
     createdAt: string;
   }) => {
-    // Don't notify the person who posted the project
     if (data.clientClerkId === currentUserId) return;
 
-    const notif: Notification = {
-      id: `${data._id}-${Date.now()}`,
-      projectId: data._id,
+    addNotification({
+      id: `project-${data._id}`,
+      type: "new-project",
       title: data.title,
-      clientName: data.clientName,
-      budgetType: data.budgetType,
-      budgetAmount: data.budgetAmount,
+      body: `by ${data.clientName} · ₨${data.budgetAmount.toLocaleString()}${data.budgetType === "hourly" ? "/hr" : ""}`,
+      href: `/projects/${data._id}`,
+      projectId: data._id,
+      actorName: data.clientName,
       skills: data.skills,
       createdAt: data.createdAt,
-    };
-    setNotifications((prev) => {
-      // Deduplicate by projectId
-      if (prev.some((n) => n.projectId === data._id)) return prev;
-      return [notif, ...prev].slice(0, 20);
     });
-  }, [currentUserId]);
+  }, [addNotification, currentUserId]);
+
+  const handlePersonalNotification = useCallback((data: Notification) => {
+    addNotification(data);
+  }, [addNotification]);
 
   useEffect(() => {
     if (userSkills.length === 0) return;
@@ -75,6 +84,24 @@ export default function NotificationBell({ userSkills, currentUserId }: Props) {
       });
     };
   }, [userSkills, handleNewProject]);
+
+  useEffect(() => {
+    const pusher = getPusherClient();
+    const channelName = `user-${currentUserId}`;
+    const channel = pusher.subscribe(channelName);
+    channel.bind("new-notification", handlePersonalNotification);
+
+    return () => {
+      channel.unbind("new-notification", handlePersonalNotification);
+      pusher.unsubscribe(channelName);
+    };
+  }, [currentUserId, handlePersonalNotification]);
+
+  const labelFor = (type: NotificationType) => {
+    if (type === "new-bid") return "Bid";
+    if (type === "new-message") return "Message";
+    return "Project";
+  };
 
   return (
     <div className="relative">
@@ -100,31 +127,41 @@ export default function NotificationBell({ userSkills, currentUserId }: Props) {
           <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
           <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-xl">
             <div className="border-b border-gray-100 px-4 py-3">
-              <h3 className="text-sm font-semibold text-[#0e1724]">Project Notifications</h3>
+              <h3 className="text-sm font-semibold text-[#0e1724]">Notifications</h3>
             </div>
             <div className="max-h-80 overflow-y-auto">
               {notifications.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-[#97a4b3]">No notifications yet</p>
               ) : (
-                notifications.map((n) => (
+                notifications.map((notification) => (
                   <Link
-                    key={n.id}
-                    href={`/projects/${n.projectId}`}
+                    key={notification.id}
+                    href={notification.href}
                     onClick={() => setShowDropdown(false)}
                     className="block border-b border-gray-50 px-4 py-3 transition hover:bg-gray-50 last:border-0"
                   >
-                    <p className="text-sm font-medium text-[#0e1724] line-clamp-1">{n.title}</p>
-                    <p className="mt-0.5 text-xs text-[#97a4b3]">
-                      by {n.clientName} · ₨{n.budgetAmount.toLocaleString()}
-                      {n.budgetType === "hourly" && "/hr"}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {n.skills.slice(0, 3).map((s) => (
-                        <span key={s} className="rounded-full bg-[#0d7cf2]/10 px-2 py-0.5 text-[10px] font-medium text-[#0d7cf2]">
-                          {s}
-                        </span>
-                      ))}
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="rounded-full bg-[#0d7cf2]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0d7cf2]">
+                        {labelFor(notification.type)}
+                      </span>
+                      <span className="text-[11px] text-[#97a4b3]">
+                        {new Date(notification.createdAt).toLocaleTimeString("en-US", {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
                     </div>
+                    <p className="text-sm font-medium text-[#0e1724] line-clamp-1">{notification.title}</p>
+                    <p className="mt-0.5 text-xs text-[#97a4b3] line-clamp-2">{notification.body}</p>
+                    {notification.skills && notification.skills.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {notification.skills.slice(0, 3).map((skill) => (
+                          <span key={skill} className="rounded-full bg-[#0d7cf2]/10 px-2 py-0.5 text-[10px] font-medium text-[#0d7cf2]">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </Link>
                 ))
               )}
