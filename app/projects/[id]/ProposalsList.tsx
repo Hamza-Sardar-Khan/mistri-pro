@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { getConversationById, getOrCreateConversation } from "@/lib/actions/chat";
+import { useRouter } from "next/navigation";
+import { getOrCreateProposalConversation } from "@/lib/actions/chat";
 import { getPusherClient } from "@/lib/pusher-client";
-import ChatPanel, { type Conversation } from "./ChatPanel";
 
 type SortMode = "best" | "price" | "rating" | "newest";
 
@@ -63,10 +62,9 @@ function durationLabel(proposal: Proposal) {
 }
 
 export default function ProposalsList({ projectId, proposals, isOwner, currentUserId }: Props) {
-  const searchParams = useSearchParams();
+  const router = useRouter();
   const [liveProposals, setLiveProposals] = useState<Proposal[]>(proposals);
   const [sortMode, setSortMode] = useState<SortMode>("best");
-  const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [openingProposalId, setOpeningProposalId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,15 +90,6 @@ export default function ProposalsList({ projectId, proposals, isOwner, currentUs
     };
   }, [projectId]);
 
-  useEffect(() => {
-    const conversationId = searchParams.get("chat");
-    if (!conversationId) return;
-
-    getConversationById(conversationId)
-      .then((conversation) => setActiveConversation(conversation as Conversation))
-      .catch((error) => console.error(error));
-  }, [searchParams]);
-
   const sortedProposals = useMemo(() => {
     return [...liveProposals].sort((a, b) => {
       if (sortMode === "price") {
@@ -123,12 +112,8 @@ export default function ProposalsList({ projectId, proposals, isOwner, currentUs
   const openChat = async (proposal: Proposal) => {
     setOpeningProposalId(proposal._id);
     try {
-      const conversation = await getOrCreateConversation(
-        projectId,
-        proposal._id,
-        proposal.freelancerClerkId
-      );
-      setActiveConversation(conversation as Conversation);
+      const conversation = await getOrCreateProposalConversation(projectId, proposal._id);
+      router.push(`/inbox?conversation=${conversation._id}`);
     } catch (error) {
       console.error(error);
       alert("Chat could not be opened. Please try again.");
@@ -138,8 +123,7 @@ export default function ProposalsList({ projectId, proposals, isOwner, currentUs
   };
 
   return (
-    <>
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-lg font-bold text-[#0e1724]">
             Proposals ({liveProposals.length})
@@ -173,10 +157,11 @@ export default function ProposalsList({ projectId, proposals, isOwner, currentUs
           <div className="space-y-4">
             {sortedProposals.map((proposal, index) => {
               const isMine = proposal.freelancerClerkId === currentUserId;
-              const canChat = isOwner || isMine;
+              const canChat = isOwner;
 
               return (
                 <div
+                  id={`proposal-${proposal._id}`}
                   key={proposal._id}
                   className={`rounded-xl border p-5 ${
                     isMine
@@ -285,15 +270,6 @@ export default function ProposalsList({ projectId, proposals, isOwner, currentUs
             })}
           </div>
         )}
-      </div>
-
-      {activeConversation && (
-        <ChatPanel
-          conversation={activeConversation}
-          currentUserId={currentUserId}
-          onClose={() => setActiveConversation(null)}
-        />
-      )}
-    </>
+    </div>
   );
 }

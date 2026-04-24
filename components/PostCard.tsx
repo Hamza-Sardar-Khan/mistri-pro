@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import {
   toggleReaction,
   addComment,
@@ -209,12 +210,20 @@ function ReplyItem({
 
   return (
     <div className="ml-10 flex gap-2">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-[#5e6d80]">
+      <Link
+        href={`/profile/${reply.clerkUserId}`}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-bold text-[#5e6d80] transition hover:ring-2 hover:ring-[#0d7cf2]/30"
+      >
         {reply.name.charAt(0).toUpperCase()}
-      </div>
+      </Link>
       <div className="flex-1">
         <div className="rounded-xl bg-[#f5f7fa] px-3 py-2">
-          <p className="text-xs font-semibold text-[#0e1724]">{reply.name}</p>
+          <Link
+            href={`/profile/${reply.clerkUserId}`}
+            className="text-xs font-semibold text-[#0e1724] transition hover:text-[#0d7cf2]"
+          >
+            {reply.name}
+          </Link>
           <p className="text-[13px] text-[#2d3a4a]">{reply.text}</p>
         </div>
         <div className="mt-0.5 flex items-center gap-3 pl-2 text-[11px] text-[#97a4b3]">
@@ -303,13 +312,21 @@ function CommentItem({
   return (
     <div>
       <div className="flex gap-2">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-[#5e6d80]">
+        <Link
+          href={`/profile/${comment.clerkUserId}`}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-[#5e6d80] transition hover:ring-2 hover:ring-[#0d7cf2]/30"
+        >
           {comment.name.charAt(0).toUpperCase()}
-        </div>
+        </Link>
         <div className="group flex-1">
           <div className="flex items-start gap-1">
             <div className="rounded-xl bg-[#f5f7fa] px-3 py-2">
-              <p className="text-xs font-semibold text-[#0e1724]">{comment.name}</p>
+              <Link
+                href={`/profile/${comment.clerkUserId}`}
+                className="text-xs font-semibold text-[#0e1724] transition hover:text-[#0d7cf2]"
+              >
+                {comment.name}
+              </Link>
               <p className="text-sm text-[#2d3a4a]">{comment.text}</p>
             </div>
             {isOwner && (
@@ -480,17 +497,22 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       {/* Author header */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-2">
-        {post.authorAvatar ? (
-          <img src={post.authorAvatar} alt="" loading="lazy" decoding="async" className="h-10 w-10 rounded-full object-cover" />
-        ) : (
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0d7cf2] text-sm font-bold text-white">
-            {post.authorName.charAt(0).toUpperCase()}
+        <Link
+          href={`/profile/${post.authorClerkId}`}
+          className="flex min-w-0 flex-1 items-center gap-3 group"
+        >
+          {post.authorAvatar ? (
+            <img src={post.authorAvatar} alt="" loading="lazy" decoding="async" className="h-10 w-10 rounded-full object-cover transition group-hover:ring-2 group-hover:ring-[#0d7cf2]/30" />
+          ) : (
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0d7cf2] text-sm font-bold text-white transition group-hover:ring-2 group-hover:ring-[#0d7cf2]/30">
+              {post.authorName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-[#0e1724] transition group-hover:text-[#0d7cf2]">{post.authorName}</p>
+            <p className="text-xs text-[#97a4b3]">{timeAgo(post.createdAt)}</p>
           </div>
-        )}
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-[#0e1724]">{post.authorName}</p>
-          <p className="text-xs text-[#97a4b3]">{timeAgo(post.createdAt)}</p>
-        </div>
+        </Link>
         {isOwner && (
           <div className="relative">
             {!showDeleteConfirm ? (

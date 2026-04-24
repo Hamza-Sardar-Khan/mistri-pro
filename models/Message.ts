@@ -2,8 +2,8 @@ import mongoose, { Schema, Document, models, model } from "mongoose";
 
 export interface IMessage extends Document {
   conversationId: mongoose.Types.ObjectId;
-  projectId: mongoose.Types.ObjectId;
-  proposalId: mongoose.Types.ObjectId;
+  projectId?: mongoose.Types.ObjectId;
+  proposalId?: mongoose.Types.ObjectId;
   senderClerkId: string;
   senderName: string;
   senderAvatar: string;
@@ -17,8 +17,8 @@ export interface IMessage extends Document {
 const MessageSchema = new Schema<IMessage>(
   {
     conversationId: { type: Schema.Types.ObjectId, ref: "Conversation", required: true },
-    projectId: { type: Schema.Types.ObjectId, ref: "Project", required: true },
-    proposalId: { type: Schema.Types.ObjectId, ref: "Proposal", required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project" },
+    proposalId: { type: Schema.Types.ObjectId, ref: "Proposal" },
     senderClerkId: { type: String, required: true },
     senderName: { type: String, required: true },
     senderAvatar: { type: String, default: "" },
