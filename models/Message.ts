@@ -1,0 +1,37 @@
+import mongoose, { Schema, Document, models, model } from "mongoose";
+
+export interface IMessage extends Document {
+  conversationId: mongoose.Types.ObjectId;
+  projectId?: mongoose.Types.ObjectId;
+  proposalId?: mongoose.Types.ObjectId;
+  senderClerkId: string;
+  senderName: string;
+  senderAvatar: string;
+  recipientClerkId: string;
+  text: string;
+  readAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const MessageSchema = new Schema<IMessage>(
+  {
+    conversationId: { type: Schema.Types.ObjectId, ref: "Conversation", required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: "Project" },
+    proposalId: { type: Schema.Types.ObjectId, ref: "Proposal" },
+    senderClerkId: { type: String, required: true },
+    senderName: { type: String, required: true },
+    senderAvatar: { type: String, default: "" },
+    recipientClerkId: { type: String, required: true },
+    text: { type: String, required: true, maxlength: 2000 },
+    readAt: { type: Date },
+  },
+  { timestamps: true }
+);
+
+MessageSchema.index({ conversationId: 1, createdAt: 1 });
+MessageSchema.index({ recipientClerkId: 1, createdAt: -1 });
+
+const Message = models.Message || model<IMessage>("Message", MessageSchema);
+
+export default Message;

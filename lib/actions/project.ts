@@ -5,6 +5,8 @@ import { currentUser } from "@clerk/nextjs/server";
 import connectDB from "@/lib/db";
 import Project from "@/models/Project";
 import Proposal from "@/models/Proposal";
+import Conversation from "@/models/Conversation";
+import Message from "@/models/Message";
 import User from "@/models/User";
 import { getPusherServer } from "@/lib/pusher-server";
 import { revalidatePath } from "next/cache";
@@ -89,15 +91,34 @@ export async function submitProposal(data: {
   description: string;
   audioUrls: string[];
   budgetAmount: number;
+  estimatedArrivalAt: string;
+  estimatedDurationValue: number;
+  estimatedDurationUnit: "hours" | "days";
 }) {
   const user = await currentUser();
   if (!user) throw new Error("Unauthorized");
 
   await connectDB();
 
+  const project = await Project.findById(data.projectId);
+  if (!project) throw new Error("Project not found");
+  if (project.clientClerkId === user.id) throw new Error("You cannot bid on your own project");
+  if (project.status !== "open") throw new Error("This project is not open for bids");
+
   // Get the user profile for rating and skills
   const dbUser = await User.findOne({ clerkUserId: user.id });
   if (!dbUser) throw new Error("Profile not found");
+
+  const estimatedArrivalAt = new Date(data.estimatedArrivalAt);
+  if (Number.isNaN(estimatedArrivalAt.getTime())) {
+    throw new Error("Estimated arrival time is invalid");
+  }
+  if (!data.budgetAmount || data.budgetAmount <= 0) {
+    throw new Error("Bid amount must be greater than zero");
+  }
+  if (!data.estimatedDurationValue || data.estimatedDurationValue <= 0) {
+    throw new Error("Estimated duration must be greater than zero");
+  }
 
   // Calculate average rating (mock for now, will use real when reviews exist)
   const avgRating = 0;
@@ -112,10 +133,29 @@ export async function submitProposal(data: {
     description: data.description,
     audioUrls: data.audioUrls,
     budgetAmount: data.budgetAmount,
+    estimatedArrivalAt,
+    estimatedDurationValue: data.estimatedDurationValue,
+    estimatedDurationUnit: data.estimatedDurationUnit,
   });
 
+  const serialized = JSON.parse(JSON.stringify(proposal));
+  const pusher = getPusherServer();
+  await Promise.all([
+    pusher.trigger(`project-${data.projectId}`, "new-bid", { proposal: serialized }),
+    pusher.trigger(`user-${project.clientClerkId}`, "new-notification", {
+      id: `bid-${serialized._id}`,
+      type: "new-bid",
+      title: "New bid received",
+      body: `${serialized.freelancerName} bid ₨${serialized.budgetAmount.toLocaleString()} on ${project.title}`,
+      href: `/projects/${data.projectId}`,
+      projectId: data.projectId,
+      actorName: serialized.freelancerName,
+      createdAt: serialized.createdAt,
+    }),
+  ]);
+
   revalidatePath(`/projects/${data.projectId}`);
-  return JSON.parse(JSON.stringify(proposal));
+  return serialized;
 }
 
 /* ── Get all proposals for a project, ranked by rating then time ── */
@@ -223,6 +263,8 @@ export async function deleteProject(projectId: string) {
   await Promise.all([
     Project.findByIdAndDelete(projectId),
     Proposal.deleteMany({ projectId: project._id }),
+    Conversation.deleteMany({ projectId: project._id }),
+    Message.deleteMany({ projectId: project._id }),
   ]);
 
   revalidatePath("/projects/mine");

@@ -10,6 +10,9 @@ export interface IProposal extends Document {
   description: string;
   audioUrls: string[];
   budgetAmount: number;
+  estimatedArrivalAt: Date;
+  estimatedDurationValue: number;
+  estimatedDurationUnit: "hours" | "days";
   status: "pending" | "accepted" | "rejected";
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +29,9 @@ const ProposalSchema = new Schema<IProposal>(
     description: { type: String, required: true },
     audioUrls: [{ type: String }],
     budgetAmount: { type: Number, required: true },
+    estimatedArrivalAt: { type: Date, required: true },
+    estimatedDurationValue: { type: Number, required: true, min: 1 },
+    estimatedDurationUnit: { type: String, enum: ["hours", "days"], required: true },
     status: { type: String, enum: ["pending", "accepted", "rejected"], default: "pending" },
   },
   { timestamps: true }

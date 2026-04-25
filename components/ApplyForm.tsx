@@ -16,6 +16,9 @@ export default function ApplyForm({ projectId, projectTitle }: { projectId: stri
 
   const [description, setDescription] = useState("");
   const [budgetAmount, setBudgetAmount] = useState("");
+  const [estimatedArrivalAt, setEstimatedArrivalAt] = useState("");
+  const [estimatedDurationValue, setEstimatedDurationValue] = useState("");
+  const [estimatedDurationUnit, setEstimatedDurationUnit] = useState<"hours" | "days">("hours");
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
@@ -37,7 +40,7 @@ export default function ApplyForm({ projectId, projectTitle }: { projectId: stri
   };
 
   const handleSubmit = async () => {
-    if (!description.trim() || !budgetAmount) return;
+    if (!description.trim() || !budgetAmount || !estimatedArrivalAt || !estimatedDurationValue) return;
     setIsSubmitting(true);
 
     try {
@@ -59,6 +62,9 @@ export default function ApplyForm({ projectId, projectTitle }: { projectId: stri
         description,
         audioUrls,
         budgetAmount: Number(budgetAmount),
+        estimatedArrivalAt,
+        estimatedDurationValue: Number(estimatedDurationValue),
+        estimatedDurationUnit,
       });
 
       router.push(`/projects/${projectId}`);
@@ -142,10 +148,50 @@ export default function ApplyForm({ projectId, projectTitle }: { projectId: stri
             </div>
           </div>
 
+          <div className="mb-6 grid gap-4 sm:grid-cols-[1fr_150px_130px]">
+            <div>
+              <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Arrival / Start Time</label>
+              <input
+                type="datetime-local"
+                value={estimatedArrivalAt}
+                onChange={(e) => setEstimatedArrivalAt(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Duration</label>
+              <input
+                type="number"
+                min="1"
+                placeholder="e.g. 4"
+                value={estimatedDurationValue}
+                onChange={(e) => setEstimatedDurationValue(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none placeholder:text-[#97a4b3] focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Unit</label>
+              <select
+                value={estimatedDurationUnit}
+                onChange={(e) => setEstimatedDurationUnit(e.target.value as "hours" | "days")}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
+              >
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+              </select>
+            </div>
+          </div>
+
           {/* Submit */}
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !description.trim() || !budgetAmount}
+            disabled={
+              isSubmitting ||
+              !description.trim() ||
+              !budgetAmount ||
+              !estimatedArrivalAt ||
+              !estimatedDurationValue
+            }
             className="w-full rounded-lg bg-[#0d7cf2] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0b6ad4] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? uploadProgress || "Submitting..." : "Submit Proposal"}

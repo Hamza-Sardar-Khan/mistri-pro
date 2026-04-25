@@ -35,6 +35,12 @@ export default async function AppHeader() {
         <div className="flex items-center gap-3">
           <ProjectsDropdown />
           <Link
+            href="/inbox"
+            className="hidden text-sm font-medium text-[#5e6d80] transition hover:text-[#0d7cf2] sm:inline-flex"
+          >
+            Inbox
+          </Link>
+          <Link
             href="/projects/post"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-[#0d7cf2] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0b6ad4]"
           >
