@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 /* ── Fetch all posts (newest first) ── */
 export async function getPosts() {
   await connectDB();
+
   const posts = await Post.find({}).sort({ createdAt: -1 }).lean();
   return JSON.parse(JSON.stringify(posts));
 }
@@ -17,6 +18,14 @@ export async function createPost(formData: {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  repostOriginal?: {
+    authorName: string;
+    authorAvatar: string;
+    content: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    createdAt: string;
+  };
 }) {
   const user = await currentUser();
   if (!user) throw new Error("Unauthorized");
@@ -30,6 +39,12 @@ export async function createPost(formData: {
     content: formData.content || "",
     imageUrl: formData.imageUrl || undefined,
     videoUrl: formData.videoUrl || undefined,
+    repostOriginal: formData.repostOriginal
+      ? {
+          ...formData.repostOriginal,
+          createdAt: new Date(formData.repostOriginal.createdAt),
+        }
+      : undefined,
     reactions: [],
     comments: [],
   });

@@ -4,6 +4,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import type { Skill } from "@/lib/constants";
+import { revalidatePath } from "next/cache";
 
 /**
  * Ensures the currently signed-in Clerk user has a corresponding
@@ -128,6 +129,10 @@ export async function saveProfileSetup(data: {
     },
     { new: true, upsert: true }
   );
+
+  revalidatePath("/profile");
+  revalidatePath("/dashboard");
+  revalidatePath("/");
 
   return JSON.parse(JSON.stringify(dbUser));
 }

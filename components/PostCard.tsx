@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import {
   toggleReaction,
+  createPost,
   addComment,
   toggleCommentLike,
   addReply,
@@ -14,11 +15,11 @@ import {
 
 /* ── Reaction config ── */
 const REACTIONS = [
-  { type: "like", emoji: "🩵", label: "Like" },
+  { type: "like", emoji: "❤️", label: "Like" },
   { type: "love", emoji: "🔥", label: "Love" },
   { type: "haha", emoji: "🤣", label: "Haha" },
-  { type: "wow", emoji: "🤯", label: "Wow" },
-  { type: "sad", emoji: "🥺", label: "Sad" },
+  { type: "wow", emoji: "😱", label: "Wow" },
+  { type: "sad", emoji: "😟", label: "Sad" },
   { type: "angry", emoji: "💀", label: "Nah" },
 ] as const;
 
@@ -61,6 +62,14 @@ interface PostData {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  repostOriginal?: {
+    authorName: string;
+    authorAvatar: string;
+    content: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    createdAt: string;
+  };
   reactions: Reaction[];
   comments: Comment[];
   createdAt: string;
@@ -85,6 +94,23 @@ function timeAgo(dateStr: string) {
   return date.toLocaleDateString();
 }
 
+function renderPostContent(content: string) {
+  const parts = content.split(/(#[\w-]+)/g);
+  return parts.map((part, index) => {
+    if (/^#[\w-]+$/.test(part)) {
+      return (
+        <span
+          key={`${part}-${index}`}
+          className="rounded-full bg-[#e9f2ff] px-2 py-0.5 text-xs font-semibold text-[#0d7cf2]"
+        >
+          {part}
+        </span>
+      );
+    }
+    return <span key={`${part}-${index}`}>{part}</span>;
+  });
+}
+
 /* ── Reactions summary badges ── */
 function ReactionBadges({
   reactions,
@@ -98,15 +124,12 @@ function ReactionBadges({
   for (const r of reactions) {
     counts[r.type] = (counts[r.type] || 0) + 1;
   }
-  const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const topEmojis = sorted.slice(0, 3).map(([t]) => REACTION_MAP[t]?.emoji ?? "👍");
-
+  const topReaction = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  const emoji = REACTION_MAP[topReaction]?.emoji ?? "❤️";
   return (
     <button onClick={onClick} className="flex items-center gap-1 hover:underline">
-      <span className="flex -space-x-0.5 text-sm">
-        {topEmojis.map((e, i) => (
-          <span key={i}>{e}</span>
-        ))}
+      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#e9f2ff] text-[#0d7cf2]">
+        <span className="text-xs">{emoji}</span>
       </span>
       <span>{reactions.length}</span>
     </button>
@@ -419,6 +442,9 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
   const [optimisticComments, setOptimisticComments] = useState<Comment[]>(post.comments);
   const [deleted, setDeleted] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRepostModal, setShowRepostModal] = useState(false);
+  const [repostText, setRepostText] = useState("");
+  const [isReposting, setIsReposting] = useState(false);
 
   // Reactions
   const [reactions, setReactions] = useState<Reaction[]>(post.reactions ?? []);
@@ -462,6 +488,33 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
     } catch (err) {
       setDeleted(false);
       console.error(err);
+    }
+  };
+
+  const handleRepost = async () => {
+    setIsReposting(true);
+    const baseContent = post.content?.trim() ?? "";
+    const prefix = repostText.trim();
+    const content = prefix || "";
+
+    try {
+      await createPost({
+        content,
+        repostOriginal: {
+          authorName: post.authorName,
+          authorAvatar: post.authorAvatar,
+          content: baseContent,
+          imageUrl: post.imageUrl,
+          videoUrl: post.videoUrl,
+          createdAt: post.createdAt,
+        },
+      });
+      setRepostText("");
+      setShowRepostModal(false);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsReposting(false);
     }
   };
 
@@ -538,17 +591,75 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
       {/* Content */}
       {post.content && (
         <div className="px-5 py-2">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#2d3a4a]">{post.content}</p>
+          <p className="whitespace-pre-wrap text-sm leading-snug text-[#2d3a4a]">
+            {renderPostContent(post.content)}
+          </p>
+        </div>
+      )}
+
+      {post.repostOriginal && (
+        <div className="mx-5 mb-2 rounded-xl border border-gray-200 bg-[#f9fafb] p-4">
+          <div className="flex items-center gap-2">
+            {post.repostOriginal.authorAvatar ? (
+              <img
+                src={post.repostOriginal.authorAvatar}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="h-7 w-7 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#0d7cf2] text-[10px] font-bold text-white">
+                {post.repostOriginal.authorName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-semibold text-[#0e1724]">
+                {post.repostOriginal.authorName}
+              </p>
+              <p className="text-[11px] text-[#97a4b3]">
+                {timeAgo(post.repostOriginal.createdAt)}
+              </p>
+            </div>
+          </div>
+          {post.repostOriginal.content && (
+            <p className="mt-3 text-sm text-[#2d3a4a]">
+              {post.repostOriginal.content}
+            </p>
+          )}
+          {post.repostOriginal.imageUrl && (
+            <div className="mt-3">
+              <img
+                src={post.repostOriginal.imageUrl}
+                alt="repost image"
+                loading="lazy"
+                decoding="async"
+                className="w-full rounded-lg object-cover"
+              />
+            </div>
+          )}
+          {post.repostOriginal.videoUrl && (
+            <div className="mt-3">
+              <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "16/9" }}>
+                <video
+                  src={post.repostOriginal.videoUrl}
+                  controls
+                  preload="none"
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Media */}
-      {post.imageUrl && (
+      {post.imageUrl && !post.repostOriginal && (
         <div className="px-5 pb-2">
           <img src={post.imageUrl} alt="post image" loading="lazy" decoding="async" className="w-full rounded-lg object-cover" />
         </div>
       )}
-      {post.videoUrl && (
+      {post.videoUrl && !post.repostOriginal && (
         <div className="px-5 pb-2">
           <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "16/9" }}>
             <video src={post.videoUrl} controls preload="none" className="absolute inset-0 h-full w-full object-contain" />
@@ -571,9 +682,8 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
       </div>
 
       {/* Action buttons */}
-      <div className="flex border-t border-gray-100">
-        {/* Reaction button with hover picker */}
-        <div className="relative flex flex-1" onMouseEnter={onHoverEnter} onMouseLeave={onHoverLeave}>
+      <div className="grid grid-cols-3 border-t border-gray-100 text-sm">
+        <div className="relative" onMouseEnter={onHoverEnter} onMouseLeave={onHoverLeave}>
           {showReactionPicker && (
             <div className="absolute -top-11 left-1/2 z-50 flex -translate-x-1/2 gap-1 rounded-full border border-gray-200 bg-white px-2 py-1.5 shadow-lg">
               {REACTIONS.map((r) => (
@@ -590,25 +700,57 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
           )}
           <button
             onClick={handleLikeClick}
-            className={`flex flex-1 items-center justify-center gap-2 py-2.5 text-sm font-medium transition hover:bg-gray-50 ${
+            className={`flex w-full items-center justify-center gap-2 py-2.5 font-medium transition hover:bg-gray-50 ${
               myReaction ? "text-[#0d7cf2]" : "text-[#5e6d80]"
             }`}
           >
-            <span className="text-base">
-              {myReaction ? REACTION_MAP[myReaction.type]?.emoji ?? "👍" : "👍"}
-            </span>
-            {myReaction ? REACTION_MAP[myReaction.type]?.label ?? "Like" : "Like"}
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.6}
+                d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21l-7.682-8.318a4.5 4.5 0 010-6.364z"
+              />
+            </svg>
+            Like
           </button>
         </div>
 
         <button
           onClick={() => setShowComments(!showComments)}
-          className="flex flex-1 items-center justify-center gap-2 border-l border-gray-100 py-2.5 text-sm font-medium text-[#5e6d80] transition hover:bg-gray-50"
+          className="flex w-full items-center justify-center gap-2 border-l border-gray-100 py-2.5 font-medium text-[#5e6d80] transition hover:bg-gray-50"
         >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.6}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+            />
           </svg>
           Comment
+        </button>
+
+        <button
+          className="flex w-full items-center justify-center gap-2 border-l border-gray-100 py-2.5 font-medium text-[#5e6d80] transition hover:bg-gray-50"
+          type="button"
+          onClick={() => setShowRepostModal(true)}
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.6}
+              d="M17 1l4 4-4 4M21 5H9a4 4 0 00-4 4v3"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.6}
+              d="M7 23l-4-4 4-4m-4 4h12a4 4 0 004-4v-3"
+            />
+          </svg>
+          Repost
         </button>
       </div>
 
@@ -651,6 +793,52 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
       {/* Reactions modal */}
       {showReactionsModal && (
         <ReactionsModal reactions={reactions} onClose={() => setShowReactionsModal(false)} />
+      )}
+
+      {showRepostModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setShowRepostModal(false)}
+          />
+          <div className="relative z-10 w-full max-w-md rounded-xl bg-white p-4 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#0e1724]">Repost</h3>
+              <button
+                onClick={() => setShowRepostModal(false)}
+                className="text-sm text-[#97a4b3] hover:text-[#0e1724]"
+              >
+                ✕
+              </button>
+            </div>
+            <textarea
+              rows={3}
+              placeholder="Add a comment (optional)"
+              value={repostText}
+              onChange={(e) => setRepostText(e.target.value)}
+              className="mt-3 w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#0e1724] outline-none placeholder:text-[#97a4b3] focus:border-[#0d7cf2]"
+            />
+            <div className="mt-3 rounded-lg border border-gray-100 bg-[#f7f9fc] px-3 py-2 text-xs text-[#5e6d80]">
+              {post.content ? post.content.slice(0, 160) : "Sharing this post"}
+              {post.content && post.content.length > 160 ? "..." : ""}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowRepostModal(false)}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-[#5e6d80]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRepost}
+                disabled={isReposting}
+                className="rounded-lg bg-[#0d7cf2] px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {isReposting ? "Reposting..." : "Repost"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

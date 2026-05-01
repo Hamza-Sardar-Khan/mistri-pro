@@ -225,7 +225,7 @@ export default function ProposalsList({ projectId, proposals, isOwner, currentUs
                     </div>
                   </div>
 
-                  <div className="mb-3 grid gap-2 sm:grid-cols-2">
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
                     <div className="rounded-lg border border-gray-100 bg-white px-3 py-2">
                       <p className="text-[11px] font-medium text-[#97a4b3]">ETA / Start</p>
                       <p className="mt-0.5 text-sm font-semibold text-[#0e1724]">

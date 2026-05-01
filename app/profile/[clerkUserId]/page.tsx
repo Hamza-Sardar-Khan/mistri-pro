@@ -59,23 +59,44 @@ export default async function Page({ params }: Props) {
 
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
-                <p className="mb-0.5 text-xs text-[#97a4b3]">Hourly Rate</p>
+                <p className="mb-0.5 inline-flex items-center gap-1 text-xs text-[#97a4b3]">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 8c-2.21 0-4 1.79-4 4m4-4c2.21 0 4 1.79 4 4m-4-4V6m0 12v-2m7-4h-2M7 12H5" />
+                  </svg>
+                  Hourly Rate
+                </p>
                 <p className="text-lg font-bold text-[#0e1724]">
                   {profile.hourlyRate > 0 ? `₨${profile.hourlyRate}` : "-"}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
-                <p className="mb-0.5 text-xs text-[#97a4b3]">Location</p>
+                <p className="mb-0.5 inline-flex items-center gap-1 text-xs text-[#97a4b3]">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 21s6-5.373 6-10a6 6 0 10-12 0c0 4.627 6 10 6 10z" />
+                    <circle cx="12" cy="11" r="2.5" strokeWidth={1.6} />
+                  </svg>
+                  Location
+                </p>
                 <p className="truncate text-sm font-semibold text-[#0e1724]">
                   {profile.city || "-"}{profile.city && profile.country ? `, ${profile.country}` : ""}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
-                <p className="mb-0.5 text-xs text-[#97a4b3]">Skills</p>
+                <p className="mb-0.5 inline-flex items-center gap-1 text-xs text-[#97a4b3]">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 3h6l1 2h4v6a7 7 0 01-14 0V5h4l1-2z" />
+                  </svg>
+                  Skills
+                </p>
                 <p className="text-lg font-bold text-[#0e1724]">{profile.skills?.length ?? 0}</p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
-                <p className="mb-0.5 text-xs text-[#97a4b3]">Member Since</p>
+                <p className="mb-0.5 inline-flex items-center gap-1 text-xs text-[#97a4b3]">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 7V5m8 2V5M4 9h16M6 12h4m-4 4h3m6-4h3m-3 4h2" />
+                  </svg>
+                  Member Since
+                </p>
                 <p className="text-sm font-semibold text-[#0e1724]">
                   {new Date(profile.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                 </p>
