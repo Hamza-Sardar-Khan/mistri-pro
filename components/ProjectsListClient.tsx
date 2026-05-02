@@ -45,8 +45,8 @@ export default function ProjectsListClient({ projects }: { projects: Project[] }
               <p className="mt-3 text-sm text-[#5e6d80] line-clamp-2">{p.description ?? "No description"}</p>
               <div className="mt-4 flex items-center gap-2 text-sm text-[#5e6d80]">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs">$ Budget</span>
-                  <span className="font-semibold text-[#0e1724]">{p.budgetAmount ? `$${p.budgetAmount.toLocaleString()}` : "—"}</span>
+                  <span className="text-xs">Budget</span>
+                  <span className="font-semibold text-[#0e1724]">{p.budgetAmount ? `₨${p.budgetAmount.toLocaleString()}` : "—"}</span>
                 </div>
                 <div className="ml-4 flex items-center gap-2">
                   <span className="text-xs">Applicants</span>
@@ -57,7 +57,7 @@ export default function ProjectsListClient({ projects }: { projects: Project[] }
 
             <div className="flex flex-col items-end gap-3">
               <Link
-                href={`/projects/${p._id}`}
+                href={`/projects/${p._id}#applicants`}
                 className="inline-flex items-center gap-2 rounded-lg border border-[#0d7cf2] bg-white px-4 py-2 text-sm font-semibold text-[#0d7cf2] hover:bg-[#0d7cf2] hover:text-white"
               >
                 View Applicants

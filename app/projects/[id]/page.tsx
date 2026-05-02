@@ -1,9 +1,11 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getProjectById, getProjectProposals, hasUserProposed } from "@/lib/actions/project";
+import { getProjectById, getProjectContract, getProjectProposals, hasUserProposed } from "@/lib/actions/project";
 import Link from "next/link";
 import AppFooter from "@/components/AppFooter";
 import ProjectHeaderActions from "./ProjectHeaderActions";
+import ProjectContractPanel from "./ProjectContractPanel";
+import ProposalsList from "./ProposalsList";
 import connectDB from "@/lib/db";
 import User from "@/models/User";
 import Project from "@/models/Project";
@@ -32,9 +34,10 @@ export default async function ProjectDetailPage({ params }: Props) {
   const user = await currentUser();
   if (!user) redirect("/");
 
-  const [project, proposals, alreadyProposed] = await Promise.all([
+  const [project, proposals, contract, alreadyProposed] = await Promise.all([
     getProjectById(id),
     getProjectProposals(id),
+    getProjectContract(id),
     hasUserProposed(id),
   ]);
 
@@ -142,6 +145,13 @@ export default async function ProjectDetailPage({ params }: Props) {
 
           <div className="mt-8 grid gap-6 lg:grid-cols-[2fr_1fr]">
             <div className="space-y-6">
+              {contract && (
+                <ProjectContractPanel
+                  contract={contract as Parameters<typeof ProjectContractPanel>[0]["contract"]}
+                  currentUserId={user.id}
+                />
+              )}
+
               <div className="rounded-2xl border border-gray-200 bg-white p-5">
                 <h3 className="text-sm font-bold text-[#0e1724]">Project Description</h3>
                 <div className="mt-3 space-y-3 text-sm leading-relaxed text-[#5e6d80]">
@@ -189,6 +199,15 @@ export default async function ProjectDetailPage({ params }: Props) {
                 </div>
               )}
 
+              <ProposalsList
+                projectId={id}
+                proposals={proposals}
+                isOwner={isOwner}
+                currentUserId={user.id}
+                projectStatus={project.status}
+                hasContract={Boolean(contract)}
+              />
+
               <div className="rounded-2xl border border-gray-200 bg-white p-5">
                 <h3 className="text-sm font-bold text-[#0e1724]">Security &amp; Safety</h3>
                 <div className="mt-3 rounded-xl border border-gray-100 bg-[#f8fafc] p-4 text-xs text-[#5e6d80]">
@@ -201,7 +220,11 @@ export default async function ProjectDetailPage({ params }: Props) {
                     <div>
                       <p className="text-sm font-semibold text-[#0e1724]">Mistri Pro Payment Protection</p>
                       <p className="mt-1 text-xs text-[#97a4b3]">
-                        Always use the platform to communicate and release payments. Our escrow service protects your funds until milestones are completed and approved.
+                        {contract
+                          ? contract.paymentStatus === "released"
+                            ? "Dummy payment has been released after client approval."
+                            : "Dummy payment is deposited in escrow and releases when the client approves completion."
+                          : "Always use the platform to communicate and release payments. Dummy escrow protects funds until milestones are completed and approved."}
                       </p>
                     </div>
                   </div>
@@ -274,6 +297,18 @@ export default async function ProjectDetailPage({ params }: Props) {
                     <span>Start Date</span>
                     <span className="font-semibold text-[#0e1724]">{startDateLabel}</span>
                   </div>
+                  {contract && (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span>Hired</span>
+                        <span className="font-semibold text-[#0e1724]">{contract.workerName}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Payment</span>
+                        <span className="font-semibold capitalize text-[#0e1724]">{contract.paymentStatus}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { SignOutButton } from "@clerk/nextjs";
 import { useState, useRef } from "react";
 import Link from "next/link";
 
@@ -21,9 +22,11 @@ export default function ProfileMenu({ avatarUrl, userName }: ProfileMenuProps) {
     timeout.current = setTimeout(() => setOpen(false), 150);
   };
 
+  const toggle = () => setOpen((value) => !value);
+
   return (
     <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
-      <button className="flex items-center gap-2" aria-haspopup="menu" aria-expanded={open}>
+      <button onClick={toggle} className="flex items-center gap-2" aria-haspopup="menu" aria-expanded={open}>
         {avatarUrl ? (
           <img
             src={avatarUrl}
@@ -43,6 +46,7 @@ export default function ProfileMenu({ avatarUrl, userName }: ProfileMenuProps) {
         <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl">
           <Link
             href="/profile"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#0e1724] transition hover:bg-gray-50"
           >
             <svg className="h-4 w-4 text-[#5e6d80]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -52,6 +56,7 @@ export default function ProfileMenu({ avatarUrl, userName }: ProfileMenuProps) {
           </Link>
           <Link
             href="/projects/saved"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#0e1724] transition hover:bg-gray-50"
           >
             <svg className="h-4 w-4 text-[#5e6d80]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -61,6 +66,7 @@ export default function ProfileMenu({ avatarUrl, userName }: ProfileMenuProps) {
           </Link>
           <Link
             href="/profile/edit"
+            onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#0e1724] transition hover:bg-gray-50"
           >
             <svg className="h-4 w-4 text-[#5e6d80]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,6 +74,15 @@ export default function ProfileMenu({ avatarUrl, userName }: ProfileMenuProps) {
             </svg>
             Edit Profile
           </Link>
+          <div className="my-1 border-t border-gray-100" />
+          <SignOutButton>
+            <button className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#b42318] transition hover:bg-red-50">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3-3H9.75m9 0l-3-3m3 3l-3 3" />
+              </svg>
+              Log Out
+            </button>
+          </SignOutButton>
         </div>
       )}
     </div>

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getPusherClient } from "@/lib/pusher-client";
 import Link from "next/link";
 
-type NotificationType = "new-project" | "new-bid" | "new-message";
+type NotificationType = "new-project" | "new-bid" | "new-message" | "hire" | "completion" | "review" | "project-alert";
 
 interface Notification {
   id: string;
@@ -21,10 +21,11 @@ interface Notification {
 interface Props {
   userSkills: string[];
   currentUserId: string;
+  initialNotifications?: Notification[];
 }
 
-export default function NotificationBell({ userSkills, currentUserId }: Props) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+export default function NotificationBell({ userSkills, currentUserId, initialNotifications = [] }: Props) {
+  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const [showDropdown, setShowDropdown] = useState(false);
   const [seenCount, setSeenCount] = useState(0);
 
@@ -100,6 +101,10 @@ export default function NotificationBell({ userSkills, currentUserId }: Props) {
   const labelFor = (type: NotificationType) => {
     if (type === "new-bid") return "Bid";
     if (type === "new-message") return "Message";
+    if (type === "hire") return "Hire";
+    if (type === "completion") return "Status";
+    if (type === "review") return "Review";
+    if (type === "project-alert") return "Alert";
     return "Project";
   };
 
@@ -125,11 +130,11 @@ export default function NotificationBell({ userSkills, currentUserId }: Props) {
       {showDropdown && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white shadow-xl">
+          <div className="fixed inset-x-3 top-16 z-50 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80">
             <div className="border-b border-gray-100 px-4 py-3">
               <h3 className="text-sm font-semibold text-[#0e1724]">Notifications</h3>
             </div>
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-[calc(100dvh-9rem)] overflow-y-auto sm:max-h-80">
               {notifications.length === 0 ? (
                 <p className="px-4 py-6 text-center text-sm text-[#97a4b3]">No notifications yet</p>
               ) : (

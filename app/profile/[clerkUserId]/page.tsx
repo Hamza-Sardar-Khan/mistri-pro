@@ -1,12 +1,84 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getUserProfile } from "@/lib/actions/user";
+import { getReceivedReviews, getUserReviewStats } from "@/lib/actions/review";
 import MessageButton from "./MessageButton";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ clerkUserId: string }>;
+}
+
+function StarRating({ rating }: { rating: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <svg
+          key={star}
+          className={`h-4 w-4 ${star <= rating ? "text-yellow-400" : "text-gray-200"}`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+type ReviewItem = {
+  _id: string;
+  reviewerName: string;
+  rating: number;
+  comment: string;
+  projectTitle: string;
+  role: "client-to-worker" | "worker-to-client";
+  createdAt: string;
+};
+
+function ReviewSection({
+  title,
+  description,
+  reviews,
+}: {
+  title: string;
+  description: string;
+  reviews: ReviewItem[];
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="text-sm font-bold text-[#0e1724]">{title}</h4>
+        <p className="mt-0.5 text-xs text-[#97a4b3]">{description}</p>
+      </div>
+      {reviews.length === 0 ? (
+        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center text-sm text-[#97a4b3]">
+          No reviews in this category yet.
+        </div>
+      ) : (
+        reviews.map((review) => (
+          <div key={review._id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+            <div className="mb-2 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#0e1724]">{review.reviewerName}</p>
+                <p className="text-xs text-[#97a4b3]">
+                  {new Date(review.createdAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+              <StarRating rating={review.rating} />
+            </div>
+            <p className="mb-1.5 text-xs font-medium text-[#0d7cf2]">Project: {review.projectTitle}</p>
+            <p className="text-sm leading-relaxed text-[#5e6d80]">{review.comment}</p>
+          </div>
+        ))
+      )}
+    </div>
+  );
 }
 
 export default async function Page({ params }: Props) {
@@ -17,6 +89,14 @@ export default async function Page({ params }: Props) {
 
   const profile = await getUserProfile(clerkUserId);
   if (!profile || !profile.profileComplete) redirect("/dashboard");
+  const [reviews, stats] = await Promise.all([
+    getReceivedReviews(clerkUserId),
+    getUserReviewStats(clerkUserId),
+  ]);
+  const typedReviews = reviews as ReviewItem[];
+  const sellerReviews = typedReviews.filter((review) => review.role === "client-to-worker");
+  const clientReviews = typedReviews.filter((review) => review.role === "worker-to-client");
+  const ratingLabel = stats.reviewCount > 0 ? stats.averageRating.toFixed(1) : "New";
 
   return (
     <div className="min-h-screen bg-[#f5f7fa]">
@@ -86,9 +166,10 @@ export default async function Page({ params }: Props) {
                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 3h6l1 2h4v6a7 7 0 01-14 0V5h4l1-2z" />
                   </svg>
-                  Skills
+                  Reviews
                 </p>
-                <p className="text-lg font-bold text-[#0e1724]">{profile.skills?.length ?? 0}</p>
+                <p className="text-lg font-bold text-[#0e1724]">{ratingLabel}</p>
+                <p className="text-[11px] text-[#97a4b3]">{stats.reviewCount} total</p>
               </div>
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
                 <p className="mb-0.5 inline-flex items-center gap-1 text-xs text-[#97a4b3]">
@@ -127,6 +208,41 @@ export default async function Page({ params }: Props) {
                 </p>
               </div>
             )}
+
+            <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#0e1724]">Reviews</h3>
+                <span className="text-xs font-medium text-[#97a4b3]">{stats.completedJobs} jobs done</span>
+              </div>
+              <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-[#97a4b3]">As Seller</p>
+                  <p className="mt-1 text-lg font-bold text-[#0e1724]">
+                    {stats.sellerReviewCount > 0 ? stats.sellerAverageRating.toFixed(1) : "New"}
+                  </p>
+                  <p className="text-xs text-[#97a4b3]">{stats.sellerReviewCount} client review{stats.sellerReviewCount === 1 ? "" : "s"}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-[#97a4b3]">As Client</p>
+                  <p className="mt-1 text-lg font-bold text-[#0e1724]">
+                    {stats.clientReviewCount > 0 ? stats.clientAverageRating.toFixed(1) : "New"}
+                  </p>
+                  <p className="text-xs text-[#97a4b3]">{stats.clientReviewCount} seller review{stats.clientReviewCount === 1 ? "" : "s"}</p>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <ReviewSection
+                  title="Reviews From Clients"
+                  description="Feedback received for jobs completed as a seller."
+                  reviews={sellerReviews}
+                />
+                <ReviewSection
+                  title="Reviews From Sellers"
+                  description="Feedback received from workers hired as a client."
+                  reviews={clientReviews}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-6">

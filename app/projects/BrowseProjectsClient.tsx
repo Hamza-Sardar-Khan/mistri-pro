@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AVAILABLE_LOCATIONS, AVAILABLE_SKILLS } from "@/lib/constants";
 import AppFooter from "@/components/AppFooter";
+import { createProjectAlert } from "@/lib/actions/projectAlert";
 
 type BudgetType = "fixed" | "hourly";
 
@@ -20,10 +21,17 @@ type ProjectListItem = {
 };
 
 type SortOption = "newest" | "budget-high" | "budget-low";
+type FilterSection = "category" | "budget" | "location";
 
 const BUDGET_OPTIONS: { label: string; value: BudgetType }[] = [
   { label: "Fixed Price", value: "fixed" },
   { label: "Hourly Rate", value: "hourly" },
+];
+
+const SORT_OPTIONS: { label: string; description: string; value: SortOption }[] = [
+  { label: "Newest First", description: "Recently posted projects", value: "newest" },
+  { label: "Budget: High to Low", description: "Highest budgets first", value: "budget-high" },
+  { label: "Budget: Low to High", description: "Lowest budgets first", value: "budget-low" },
 ];
 
 function timeAgo(dateStr: string) {
@@ -45,17 +53,57 @@ function normalize(value: string) {
 
 export default function BrowseProjectsClient({
   projects,
+  initialCategory = "",
+  initialSearch = "",
 }: {
   projects: ProjectListItem[];
+  initialCategory?: string;
+  initialSearch?: string;
 }) {
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const initialCategoryValue = AVAILABLE_SKILLS.includes(initialCategory as (typeof AVAILABLE_SKILLS)[number])
+    ? initialCategory
+    : "";
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    initialCategoryValue ? [initialCategoryValue] : []
+  );
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedBudgets, setSelectedBudgets] = useState<BudgetType[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [currentPage, setCurrentPage] = useState(1);
+  const [openSections, setOpenSections] = useState<Record<FilterSection, boolean>>({
+    category: false,
+    budget: false,
+    location: false,
+  });
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [creatingAlert, setCreatingAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
   const pageSize = 6;
+  const selectedSortOption = SORT_OPTIONS.find((option) => option.value === sortBy) ?? SORT_OPTIONS[0];
+
+  useEffect(() => {
+    if (!sortMenuOpen) return;
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!sortMenuRef.current?.contains(event.target as Node)) {
+        setSortMenuOpen(false);
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSortMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [sortMenuOpen]);
 
   const locationCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -141,32 +189,25 @@ export default function BrowseProjectsClient({
   ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProjects.length / pageSize));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedCategories, selectedLocations, selectedBudgets, sortBy]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
+  const safeCurrentPage = Math.min(currentPage, totalPages);
 
   const paginatedProjects = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const start = (safeCurrentPage - 1) * pageSize;
     return filteredProjects.slice(start, start + pageSize);
-  }, [filteredProjects, currentPage]);
+  }, [filteredProjects, safeCurrentPage]);
 
   const paginationItems = useMemo(() => {
     if (totalPages <= 6) {
       return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
-    if (currentPage <= 3) {
+    if (safeCurrentPage <= 3) {
       return [1, 2, 3, "ellipsis", totalPages];
     }
-    if (currentPage >= totalPages - 2) {
+    if (safeCurrentPage >= totalPages - 2) {
       return [1, "ellipsis", totalPages - 2, totalPages - 1, totalPages];
     }
-    return [1, "ellipsis", currentPage - 1, currentPage, currentPage + 1, "ellipsis", totalPages];
-  }, [currentPage, totalPages]);
+    return [1, "ellipsis", safeCurrentPage - 1, safeCurrentPage, safeCurrentPage + 1, "ellipsis", totalPages];
+  }, [safeCurrentPage, totalPages]);
 
   const clearAll = () => {
     setSearchInput("");
@@ -175,16 +216,41 @@ export default function BrowseProjectsClient({
     setSelectedLocations([]);
     setSelectedBudgets([]);
     setSortBy("newest");
+    setCurrentPage(1);
   };
 
   const toggleFilterValue = (value: string, list: string[], setList: (value: string[]) => void) => {
     setList(list.includes(value) ? list.filter((item) => item !== value) : [...list, value]);
+    setCurrentPage(1);
   };
 
   const toggleBudget = (value: BudgetType) => {
     setSelectedBudgets((prev) =>
       prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
     );
+    setCurrentPage(1);
+  };
+
+  const toggleSection = (section: FilterSection) => {
+    setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const handleCreateAlert = async () => {
+    setCreatingAlert(true);
+    setAlertMessage("");
+    try {
+      await createProjectAlert({
+        searchQuery,
+        categories: selectedCategories,
+        locations: selectedLocations,
+        budgetTypes: selectedBudgets,
+      });
+      setAlertMessage("Alert saved. You will get notifications for matching new projects.");
+    } catch (error) {
+      setAlertMessage(error instanceof Error ? error.message : "Could not create alert.");
+    } finally {
+      setCreatingAlert(false);
+    }
   };
 
   return (
@@ -208,6 +274,7 @@ export default function BrowseProjectsClient({
                 const next = e.target.value;
                 setSearchInput(next);
                 setSearchQuery(next);
+                setCurrentPage(1);
               }}
             />
           </div>
@@ -231,13 +298,17 @@ export default function BrowseProjectsClient({
               </div>
 
               <div>
-                <button className="flex w-full items-center justify-between text-sm font-semibold text-[#0e1724]">
+                <button
+                  type="button"
+                  onClick={() => toggleSection("category")}
+                  className="flex w-full items-center justify-between text-sm font-semibold text-[#0e1724]"
+                >
                   Category
-                  <svg className="h-4 w-4 text-[#97a4b3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`h-4 w-4 text-[#97a4b3] transition ${openSections.category ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className="mt-3 space-y-2 text-sm text-[#5e6d80]">
+                {openSections.category && <div className="mt-3 space-y-2 text-sm text-[#5e6d80]">
                   {AVAILABLE_SKILLS.map((item) => (
                     <label key={item} className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
@@ -252,17 +323,21 @@ export default function BrowseProjectsClient({
                       <span className="text-xs text-[#97a4b3]">{categoryCounts.get(item) ?? 0}</span>
                     </label>
                   ))}
-                </div>
+                </div>}
               </div>
 
               <div>
-                <button className="flex w-full items-center justify-between text-sm font-semibold text-[#0e1724]">
+                <button
+                  type="button"
+                  onClick={() => toggleSection("budget")}
+                  className="flex w-full items-center justify-between text-sm font-semibold text-[#0e1724]"
+                >
                   Budget Type
-                  <svg className="h-4 w-4 text-[#97a4b3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`h-4 w-4 text-[#97a4b3] transition ${openSections.budget ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className="mt-3 space-y-2 text-sm text-[#5e6d80]">
+                {openSections.budget && <div className="mt-3 space-y-2 text-sm text-[#5e6d80]">
                   {BUDGET_OPTIONS.map((item) => (
                     <label key={item.value} className="flex items-center gap-2">
                       <input
@@ -274,17 +349,21 @@ export default function BrowseProjectsClient({
                       {item.label}
                     </label>
                   ))}
-                </div>
+                </div>}
               </div>
 
               <div>
-                <button className="flex w-full items-center justify-between text-sm font-semibold text-[#0e1724]">
+                <button
+                  type="button"
+                  onClick={() => toggleSection("location")}
+                  className="flex w-full items-center justify-between text-sm font-semibold text-[#0e1724]"
+                >
                   Location
-                  <svg className="h-4 w-4 text-[#97a4b3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`h-4 w-4 text-[#97a4b3] transition ${openSections.location ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className="mt-3 space-y-2 text-sm text-[#5e6d80]">
+                {openSections.location && <div className="mt-3 space-y-2 text-sm text-[#5e6d80]">
                   {AVAILABLE_LOCATIONS.map((item) => (
                     <label key={item} className="flex items-center justify-between">
                       <span className="flex items-center gap-2">
@@ -299,7 +378,7 @@ export default function BrowseProjectsClient({
                       <span className="text-xs text-[#97a4b3]">{locationCounts.get(item) ?? 0}</span>
                     </label>
                   ))}
-                </div>
+                </div>}
               </div>
 
               <div className="rounded-xl border border-blue-100 bg-[#f1f6ff] p-3">
@@ -307,7 +386,15 @@ export default function BrowseProjectsClient({
                 <p className="mt-2 text-xs text-[#5e6d80]">
                   Save your filter settings to get notified whenever a matching project is posted.
                 </p>
-                <button className="mt-3 text-xs font-semibold text-[#0d7cf2] hover:underline">Create Alert</button>
+                <button
+                  type="button"
+                  onClick={handleCreateAlert}
+                  disabled={creatingAlert}
+                  className="mt-3 text-xs font-semibold text-[#0d7cf2] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingAlert ? "Saving..." : "Create Alert"}
+                </button>
+                {alertMessage && <p className="mt-2 text-xs text-[#5e6d80]">{alertMessage}</p>}
               </div>
             </div>
           </aside>
@@ -368,17 +455,65 @@ export default function BrowseProjectsClient({
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-xs text-[#5e6d80]">
-                <span>Sort by:</span>
-                <select
-                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-semibold text-[#0e1724]"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+              <div ref={sortMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSortMenuOpen((open) => !open)}
+                  className="inline-flex min-w-52 items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2 text-left shadow-sm transition hover:border-[#b8d5ff] hover:bg-[#f8fbff]"
+                  aria-haspopup="listbox"
+                  aria-expanded={sortMenuOpen}
                 >
-                  <option value="newest">Newest First</option>
-                  <option value="budget-high">Budget: High to Low</option>
-                  <option value="budget-low">Budget: Low to High</option>
-                </select>
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[#97a4b3]">
+                      Sort by
+                    </span>
+                    <span className="block truncate text-sm font-semibold text-[#0e1724]">
+                      {selectedSortOption.label}
+                    </span>
+                  </span>
+                  <svg className={`h-4 w-4 shrink-0 text-[#5e6d80] transition ${sortMenuOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {sortMenuOpen && (
+                  <div
+                    role="listbox"
+                    className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl"
+                  >
+                    {SORT_OPTIONS.map((option) => {
+                      const selected = sortBy === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => {
+                            setSortBy(option.value);
+                            setCurrentPage(1);
+                            setSortMenuOpen(false);
+                          }}
+                          className={`flex w-full items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition ${
+                            selected ? "bg-[#e9f2ff]" : "hover:bg-gray-50"
+                          }`}
+                        >
+                          <span className="min-w-0">
+                            <span className={`block text-sm font-semibold ${selected ? "text-[#0d7cf2]" : "text-[#0e1724]"}`}>
+                              {option.label}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-[#97a4b3]">{option.description}</span>
+                          </span>
+                          {selected && (
+                            <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#0d7cf2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -400,10 +535,10 @@ export default function BrowseProjectsClient({
               <div>
                 <div className="space-y-4">
                   {paginatedProjects.map((project) => (
-                    <div key={project._id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <div className="flex items-start justify-between gap-4">
+                    <div key={project._id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-[#0d7cf2]/30 hover:shadow-md">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-base font-semibold text-[#0e1724] line-clamp-1">
                               {project.title}
                             </h3>
@@ -423,7 +558,7 @@ export default function BrowseProjectsClient({
                             <span>{timeAgo(project.createdAt)}</span>
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="shrink-0 text-left sm:text-right">
                           <p className="text-[11px] font-semibold uppercase text-[#97a4b3]">Budget</p>
                           <p className="text-lg font-bold text-[#0d7cf2]">
                             ₨{project.budgetAmount.toLocaleString()}
@@ -432,7 +567,7 @@ export default function BrowseProjectsClient({
                         </div>
                       </div>
 
-                      <p className="mt-3 text-sm text-[#5e6d80] line-clamp-2">{project.description}</p>
+                      <p className="mt-3 text-sm leading-relaxed text-[#5e6d80] line-clamp-3">{project.description}</p>
 
                       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex flex-wrap gap-2">
@@ -441,7 +576,9 @@ export default function BrowseProjectsClient({
                               {project.category ?? project.skills[0]}
                             </span>
                           )}
-                          {project.skills?.map((skill) => (
+                          {Array.from(new Set(project.skills ?? []))
+                            .filter((skill) => skill !== project.category)
+                            .map((skill) => (
                             <span key={skill} className="rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#5e6d80]">
                               {skill}
                             </span>
@@ -463,7 +600,7 @@ export default function BrowseProjectsClient({
                     <button
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-[#5e6d80] disabled:opacity-50"
                       onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
+                      disabled={safeCurrentPage === 1}
                     >
                       <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -478,7 +615,7 @@ export default function BrowseProjectsClient({
                         <button
                           key={item}
                           className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition ${
-                            item === currentPage
+                            item === safeCurrentPage
                               ? "bg-[#0d7cf2] text-white"
                               : "border border-gray-200 bg-white text-[#5e6d80] hover:border-[#0d7cf2] hover:text-[#0d7cf2]"
                           }`}
@@ -491,7 +628,7 @@ export default function BrowseProjectsClient({
                     <button
                       className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-xs text-[#5e6d80] disabled:opacity-50"
                       onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
+                      disabled={safeCurrentPage === totalPages}
                     >
                       <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
