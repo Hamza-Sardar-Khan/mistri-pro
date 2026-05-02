@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { syncAndCheckProfile } from "@/lib/actions/user";
 import { getPosts } from "@/lib/actions/post";
+import { getTrendingProjectSkills } from "@/lib/actions/project";
 import CreatePostPrompt from "@/components/CreatePostPrompt";
 import PostCard from "@/components/PostCard";
 import Link from "next/link";
@@ -10,9 +11,38 @@ export const dynamic = "force-dynamic";
 
 type DashboardPost = {
   _id: string;
-  content?: string;
-  authorName?: string;
-  authorClerkId?: string;
+  authorClerkId: string;
+  authorName: string;
+  authorAvatar: string;
+  content: string;
+  imageUrl?: string;
+  videoUrl?: string;
+  reactions: { userId: string; userName: string; type: string }[];
+  comments: {
+    _id: string;
+    clerkUserId: string;
+    name: string;
+    text: string;
+    likes: string[];
+    replies: {
+      _id: string;
+      clerkUserId: string;
+      name: string;
+      text: string;
+      likes: string[];
+      createdAt: string;
+    }[];
+    createdAt: string;
+  }[];
+  createdAt: string;
+  repostOriginal?: {
+    authorName: string;
+    authorAvatar: string;
+    content: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    createdAt: string;
+  };
 };
 
 export default async function DashboardPage() {
@@ -21,26 +51,16 @@ export default async function DashboardPage() {
   if (!result) redirect("/");
   if (!result.profileComplete) redirect("/profile-setup");
 
-  const [user, posts] = await Promise.all([currentUser(), getPosts()]);
+  const [user, posts, trendingSkills] = await Promise.all([
+    currentUser(),
+    getPosts(),
+    getTrendingProjectSkills(4),
+  ]);
   if (!user) redirect("/");
   const userName =
     `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Anonymous";
   const dbAvatar = result.user?.avatarUrl ?? "";
   const dashboardPosts = posts as DashboardPost[];
-
-  const trendingCounts = dashboardPosts.reduce(
-    (acc: Map<string, number>, post: { content?: string }) => {
-      if (post?.content) {
-        const matches = post.content.match(/#[\w-]+/g) ?? [];
-        matches.forEach((tag) => acc.set(tag, (acc.get(tag) ?? 0) + 1));
-      }
-      return acc;
-    },
-    new Map<string, number>()
-  );
-  const trendingSkills: [string, number][] = Array.from(trendingCounts.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
 
   const followSuggestions: { name: string; clerkUserId: string }[] = dashboardPosts
     .reduce(
@@ -65,7 +85,7 @@ export default async function DashboardPage() {
     <div className="min-h-screen bg-[#f5f7fa]">
       <main className="mx-auto w-full max-w-6xl px-4 py-6">
         <div className="grid gap-6 lg:grid-cols-[220px_1fr_260px]">
-          <aside className="hidden lg:block lg:sticky lg:top-6 lg:self-start">
+          <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start">
             <nav className="space-y-2 text-sm">
               <Link className="flex items-center gap-2 rounded-xl bg-[#e9f2ff] px-4 py-2 font-semibold text-[#0d7cf2]" href="/dashboard">
                 <span className="h-2 w-2 rounded-full bg-[#0d7cf2]" />
@@ -75,9 +95,9 @@ export default async function DashboardPage() {
                 <span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />
                 My Projects
               </Link>
-              <Link className="flex items-center gap-2 rounded-xl px-4 py-2 text-[#5e6d80] hover:bg-white" href="/dashboard">
+              <Link className="flex items-center gap-2 rounded-xl px-4 py-2 text-[#5e6d80] hover:bg-white" href="/projects/saved">
                 <span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />
-                Recent Activity
+                Saved Projects
               </Link>
               <Link className="flex items-center gap-2 rounded-xl px-4 py-2 text-[#5e6d80] hover:bg-white" href="/projects">
                 <span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />
@@ -117,7 +137,7 @@ export default async function DashboardPage() {
                   dashboardPosts.map((post) => (
                     <PostCard
                       key={post._id as string}
-                      post={post as any}
+                      post={post}
                       currentUserId={user.id}
                     />
                   ))
@@ -126,7 +146,7 @@ export default async function DashboardPage() {
             </div>
           </section>
 
-          <aside className="hidden lg:flex lg:flex-col lg:gap-6 lg:sticky lg:top-6 lg:self-start">
+          <aside className="hidden lg:flex lg:flex-col lg:gap-6 lg:sticky lg:top-20 lg:self-start">
             <div className="rounded-xl border border-gray-200 bg-white p-4">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-[#0e1724]">
                 <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#e9f2ff] text-[#0d7cf2]">
@@ -140,11 +160,15 @@ export default async function DashboardPage() {
                 {trendingSkills.length === 0 ? (
                   <p className="text-xs text-[#97a4b3]">No trends yet.</p>
                 ) : (
-                  trendingSkills.map(([tag, count]) => (
-                    <div key={tag}>
-                      <p className="font-semibold text-[#0e1724]">{tag}</p>
-                      <p className="text-xs">{count} mention{count === 1 ? "" : "s"}</p>
-                    </div>
+                  trendingSkills.map((item) => (
+                    <Link
+                      key={item.skill}
+                      href={`/projects?category=${encodeURIComponent(item.skill)}`}
+                      className="block rounded-lg px-2 py-1.5 transition hover:bg-gray-50"
+                    >
+                      <p className="font-semibold text-[#0e1724]">{item.skill}</p>
+                      <p className="text-xs">{item.count} open job{item.count === 1 ? "" : "s"}</p>
+                    </Link>
                   ))
                 )}
               </div>

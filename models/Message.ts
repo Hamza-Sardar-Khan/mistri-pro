@@ -9,6 +9,12 @@ export interface IMessage extends Document {
   senderAvatar: string;
   recipientClerkId: string;
   text: string;
+  attachments: {
+    url: string;
+    type: "image" | "video" | "audio" | "file";
+    name: string;
+    size: number;
+  }[];
   readAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -23,7 +29,15 @@ const MessageSchema = new Schema<IMessage>(
     senderName: { type: String, required: true },
     senderAvatar: { type: String, default: "" },
     recipientClerkId: { type: String, required: true },
-    text: { type: String, required: true, maxlength: 2000 },
+    text: { type: String, default: "", maxlength: 2000 },
+    attachments: [
+      {
+        url: { type: String, required: true },
+        type: { type: String, enum: ["image", "video", "audio", "file"], required: true },
+        name: { type: String, default: "" },
+        size: { type: Number, default: 0 },
+      },
+    ],
     readAt: { type: Date },
   },
   { timestamps: true }
@@ -32,6 +46,9 @@ const MessageSchema = new Schema<IMessage>(
 MessageSchema.index({ conversationId: 1, createdAt: 1 });
 MessageSchema.index({ recipientClerkId: 1, createdAt: -1 });
 
-const Message = models.Message || model<IMessage>("Message", MessageSchema);
+if (models.Message) {
+  mongoose.deleteModel("Message");
+}
+const Message = model<IMessage>("Message", MessageSchema);
 
 export default Message;

@@ -1,41 +1,11 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getMyProfile } from "@/lib/actions/user";
+import { getReceivedReviews, getUserReviewStats } from "@/lib/actions/review";
 import Link from "next/link";
 import AppFooter from "@/components/AppFooter";
 
 export const dynamic = "force-dynamic";
-
-// Placeholder reviews for UI
-const MOCK_REVIEWS = [
-  {
-    id: "1",
-    name: "Ahmed Khan",
-    avatar: "",
-    rating: 5,
-    text: "Excellent work! Fixed all the electrical issues in my house within a day. Very professional and punctual. Highly recommended.",
-    date: "2 weeks ago",
-    project: "Home Electrical Repair",
-  },
-  {
-    id: "2",
-    name: "Sara Malik",
-    avatar: "",
-    rating: 4,
-    text: "Good quality work. Showed up on time and completed the job as described. Will hire again for future projects.",
-    date: "1 month ago",
-    project: "Office Wiring Installation",
-  },
-  {
-    id: "3",
-    name: "Usman Ali",
-    avatar: "",
-    rating: 5,
-    text: "Outstanding craftsmanship. Went above and beyond to make sure everything was perfect. Very fair pricing too.",
-    date: "2 months ago",
-    project: "Kitchen Renovation",
-  },
-];
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -54,6 +24,70 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+type ReviewItem = {
+  _id: string;
+  reviewerName: string;
+  reviewerAvatar?: string;
+  rating: number;
+  comment: string;
+  projectTitle: string;
+  role: "client-to-worker" | "worker-to-client";
+  createdAt: string;
+};
+
+function ReviewSection({
+  title,
+  description,
+  reviews,
+}: {
+  title: string;
+  description: string;
+  reviews: ReviewItem[];
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="text-sm font-bold text-[#0e1724]">{title}</h4>
+        <p className="mt-0.5 text-xs text-[#97a4b3]">{description}</p>
+      </div>
+      {reviews.length === 0 ? (
+        <div className="rounded-xl border border-gray-100 bg-gray-50/50 p-6 text-center text-sm text-[#97a4b3]">
+          No reviews in this category yet.
+        </div>
+      ) : (
+        reviews.map((review) => (
+          <div key={review._id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-3">
+                {review.reviewerAvatar ? (
+                  <img src={review.reviewerAvatar} alt="" className="h-10 w-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-[#0d7cf2] flex items-center justify-center text-white text-sm font-bold">
+                    {review.reviewerName.charAt(0)}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-[#0e1724]">{review.reviewerName}</p>
+                  <p className="text-xs text-[#97a4b3]">
+                    {new Date(review.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+              </div>
+              <StarRating rating={review.rating} />
+            </div>
+            <p className="text-xs font-medium text-[#0d7cf2] mb-1.5">Project: {review.projectTitle}</p>
+            <p className="text-sm text-[#5e6d80] leading-relaxed">{review.comment}</p>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
 export default async function ProfilePage() {
   const user = await currentUser();
   if (!user) redirect("/");
@@ -61,9 +95,14 @@ export default async function ProfilePage() {
   const profile = await getMyProfile();
   if (!profile || !profile.profileComplete) redirect("/profile-setup");
 
-  const avgRating = (
-    MOCK_REVIEWS.reduce((sum, r) => sum + r.rating, 0) / MOCK_REVIEWS.length
-  ).toFixed(1);
+  const [reviews, stats] = await Promise.all([
+    getReceivedReviews(user.id),
+    getUserReviewStats(user.id),
+  ]);
+  const typedReviews = reviews as ReviewItem[];
+  const sellerReviews = typedReviews.filter((review) => review.role === "client-to-worker");
+  const clientReviews = typedReviews.filter((review) => review.role === "worker-to-client");
+  const avgRating = stats.reviewCount > 0 ? stats.averageRating.toFixed(1) : "New";
 
   return (
     <div className="min-h-screen bg-[#f5f7fa]">
@@ -113,7 +152,7 @@ export default async function ProfilePage() {
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                       </svg>
                       <span className="text-sm font-bold text-yellow-700">{avgRating}</span>
-                      <span className="text-xs text-yellow-600">({MOCK_REVIEWS.length} reviews)</span>
+                      <span className="text-xs text-yellow-600">({stats.reviewCount} reviews)</span>
                     </div>
                   </div>
                 </div>
@@ -153,7 +192,7 @@ export default async function ProfilePage() {
                   </svg>
                   Jobs Done
                 </p>
-                <p className="text-lg font-bold text-[#0e1724]">12</p>
+                <p className="text-lg font-bold text-[#0e1724]">{stats.completedJobs}</p>
               </div>
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
                 <p className="inline-flex items-center gap-1 text-xs text-[#97a4b3] mb-0.5">
@@ -208,30 +247,39 @@ export default async function ProfilePage() {
                   <svg className="w-5 h-5 text-[#0d7cf2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
-                  Client Reviews
+                  Reviews
                 </h3>
-                <span className="text-xs font-medium text-[#97a4b3]">{MOCK_REVIEWS.length} reviews</span>
+                <span className="text-xs font-medium text-[#97a4b3]">{stats.reviewCount} reviews</span>
               </div>
 
-              <div className="space-y-4">
-                {MOCK_REVIEWS.map((review) => (
-                  <div key={review.id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0d7cf2] to-[#3b93f7] flex items-center justify-center text-white text-sm font-bold">
-                          {review.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-[#0e1724]">{review.name}</p>
-                          <p className="text-xs text-[#97a4b3]">{review.date}</p>
-                        </div>
-                      </div>
-                      <StarRating rating={review.rating} />
-                    </div>
-                    <p className="text-xs font-medium text-[#0d7cf2] mb-1.5">Project: {review.project}</p>
-                    <p className="text-sm text-[#5e6d80] leading-relaxed">{review.text}</p>
-                  </div>
-                ))}
+              <div className="grid gap-3 sm:grid-cols-2 mb-5">
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-[#97a4b3]">As Seller</p>
+                  <p className="mt-1 text-lg font-bold text-[#0e1724]">
+                    {stats.sellerReviewCount > 0 ? stats.sellerAverageRating.toFixed(1) : "New"}
+                  </p>
+                  <p className="text-xs text-[#97a4b3]">{stats.sellerReviewCount} client review{stats.sellerReviewCount === 1 ? "" : "s"}</p>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+                  <p className="text-xs font-semibold text-[#97a4b3]">As Client</p>
+                  <p className="mt-1 text-lg font-bold text-[#0e1724]">
+                    {stats.clientReviewCount > 0 ? stats.clientAverageRating.toFixed(1) : "New"}
+                  </p>
+                  <p className="text-xs text-[#97a4b3]">{stats.clientReviewCount} seller review{stats.clientReviewCount === 1 ? "" : "s"}</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <ReviewSection
+                  title="Reviews From Clients"
+                  description="Feedback received for jobs completed as a seller."
+                  reviews={sellerReviews}
+                />
+                <ReviewSection
+                  title="Reviews From Sellers"
+                  description="Feedback received from workers hired as a client."
+                  reviews={clientReviews}
+                />
               </div>
             </div>
           </div>

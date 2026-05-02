@@ -105,8 +105,10 @@ export async function getOrCreateProposalConversation(projectId: string, proposa
   if (proposal.projectId.toString() !== project._id.toString()) {
     throw new Error("Proposal does not belong to this project");
   }
-  if (project.clientClerkId !== user.id) {
-    throw new Error("Only the project owner can start a proposal chat");
+  const isClient = project.clientClerkId === user.id;
+  const isFreelancer = proposal.freelancerClerkId === user.id;
+  if (!isClient && !isFreelancer) {
+    throw new Error("Only project participants can open this proposal chat");
   }
 
   const directKey = directKeyFor(project.clientClerkId, proposal.freelancerClerkId);
@@ -239,16 +241,43 @@ export async function getConversationMessages(conversationId: string) {
   return serialize(messages);
 }
 
-export async function sendMessage(conversationId: string, text: string) {
+type MessageAttachmentInput = {
+  url: string;
+  type: "image" | "video" | "audio" | "file";
+  name: string;
+  size: number;
+};
+
+function attachmentPreview(attachment?: MessageAttachmentInput) {
+  if (!attachment) return "Attachment";
+  if (attachment.type === "image") return "Image";
+  if (attachment.type === "video") return "Video";
+  if (attachment.type === "audio") return "Audio";
+  return "File";
+}
+
+export async function sendMessage(data: {
+  conversationId: string;
+  text: string;
+  attachments?: MessageAttachmentInput[];
+}) {
   const user = await currentUser();
   if (!user) throw new Error("Unauthorized");
 
-  const cleanText = text.trim();
-  if (!cleanText) throw new Error("Message cannot be empty");
+  const cleanText = data.text.trim();
+  const attachments = (data.attachments ?? []).map((attachment) => ({
+    url: attachment.url.trim(),
+    type: attachment.type,
+    name: attachment.name.trim(),
+    size: Number(attachment.size) || 0,
+  })).filter((attachment) => attachment.url);
+
+  if (!cleanText && attachments.length === 0) throw new Error("Message cannot be empty");
   if (cleanText.length > 2000) throw new Error("Message is too long");
+  if (attachments.length > 5) throw new Error("You can attach up to 5 files per message");
 
   await connectDB();
-  const conversation = await requireParticipant(conversationId, user.id);
+  const conversation = await requireParticipant(data.conversationId, user.id);
 
   const recipientClerkId = otherParticipantId(conversation, user.id);
   if (!recipientClerkId) throw new Error("Recipient not found");
@@ -256,6 +285,7 @@ export async function sendMessage(conversationId: string, text: string) {
   const isClientSlot = conversation.clientClerkId === user.id;
   const senderName = isClientSlot ? conversation.clientName : conversation.workerName;
   const senderAvatar = isClientSlot ? conversation.clientAvatar : conversation.workerAvatar;
+  const storedText = cleanText || " ";
 
   const message = await Message.create({
     conversationId: conversation._id,
@@ -265,10 +295,11 @@ export async function sendMessage(conversationId: string, text: string) {
     senderName,
     senderAvatar,
     recipientClerkId,
-    text: cleanText,
+    text: storedText,
+    attachments,
   });
 
-  conversation.lastMessage = cleanText;
+  conversation.lastMessage = cleanText || attachmentPreview(attachments[0]);
   conversation.lastMessageAt = message.createdAt;
   if (!conversation.participantIds || conversation.participantIds.length === 0) {
     conversation.participantIds = [conversation.clientClerkId, conversation.workerClerkId];
@@ -288,7 +319,7 @@ export async function sendMessage(conversationId: string, text: string) {
       id: `message-${serializedMessage._id}`,
       type: "new-message",
       title: "New message",
-      body: `${senderName}: ${cleanText}`,
+      body: `${senderName}: ${conversation.lastMessage}`,
       href: `/inbox?conversation=${conversation._id.toString()}`,
       projectId: conversation.projectId?.toString(),
       conversationId: conversation._id.toString(),
