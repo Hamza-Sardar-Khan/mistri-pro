@@ -8,6 +8,13 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+type DashboardPost = {
+  _id: string;
+  content?: string;
+  authorName?: string;
+  authorClerkId?: string;
+};
+
 export default async function DashboardPage() {
   // Single call: sync user + check profile completion
   const result = await syncAndCheckProfile();
@@ -19,8 +26,9 @@ export default async function DashboardPage() {
   const userName =
     `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Anonymous";
   const dbAvatar = result.user?.avatarUrl ?? "";
+  const dashboardPosts = posts as DashboardPost[];
 
-  const trendingCounts = posts.reduce(
+  const trendingCounts = dashboardPosts.reduce(
     (acc: Map<string, number>, post: { content?: string }) => {
       if (post?.content) {
         const matches = post.content.match(/#[\w-]+/g) ?? [];
@@ -30,17 +38,17 @@ export default async function DashboardPage() {
     },
     new Map<string, number>()
   );
-  const trendingSkills = Array.from(trendingCounts.entries())
+  const trendingSkills: [string, number][] = Array.from(trendingCounts.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 4);
 
-  const followSuggestions = posts
-    .filter(
-      (post: { authorName?: string; authorClerkId?: string }) =>
-        post.authorClerkId && post.authorClerkId !== user.id
-    )
+  const followSuggestions: { name: string; clerkUserId: string }[] = dashboardPosts
     .reduce(
-      (acc: { name: string; clerkUserId: string }[], post: any) => {
+      (acc: { name: string; clerkUserId: string }[], post) => {
+        if (!post.authorClerkId || post.authorClerkId === user.id) {
+          return acc;
+        }
+
         if (!acc.find((item) => item.clerkUserId === post.authorClerkId)) {
           acc.push({
             name: post.authorName || "Anonymous",
@@ -100,13 +108,13 @@ export default async function DashboardPage() {
                 <span>Recent updates</span>
               </div>
               <div className="mt-4 space-y-4">
-                {posts.length === 0 ? (
+                {dashboardPosts.length === 0 ? (
                   <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-[#97a4b3]">
                     <p className="text-base font-medium">No posts yet</p>
                     <p className="mt-1 text-sm">Be the first to share something!</p>
                   </div>
                 ) : (
-                  posts.map((post: Record<string, unknown>) => (
+                  dashboardPosts.map((post) => (
                     <PostCard
                       key={post._id as string}
                       post={post as any}

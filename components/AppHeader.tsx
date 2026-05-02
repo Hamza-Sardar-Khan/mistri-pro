@@ -7,9 +7,16 @@ import NotificationBell from "./NotificationBell";
 import ProfileMenu from "./ProfileMenu";
 
 async function getUserData(userId: string) {
-  await connectDB();
-  const user = await User.findOne({ clerkUserId: userId }).select("firstName lastName avatarUrl skills profileComplete").lean();
-  return user ? JSON.parse(JSON.stringify(user)) : null;
+  try {
+    await connectDB();
+    const user = await User.findOne({ clerkUserId: userId })
+      .select("firstName lastName avatarUrl skills profileComplete")
+      .lean();
+    return user ? JSON.parse(JSON.stringify(user)) : null;
+  } catch (error) {
+    console.error("Failed to load header user data:", error);
+    return null;
+  }
 }
 
 export default async function AppHeader() {
