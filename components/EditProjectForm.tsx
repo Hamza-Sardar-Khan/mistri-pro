@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AVAILABLE_SKILLS, type Skill } from "@/lib/constants";
+import { AVAILABLE_LOCATIONS, AVAILABLE_SKILLS, type Location, type Skill } from "@/lib/constants";
 import { getProjectById, updateProject } from "@/lib/actions/project";
 
 interface MediaFile {
@@ -22,6 +22,9 @@ export default function EditProjectForm({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<Skill | "">("");
+  const [location, setLocation] = useState<Location | "">("");
+  const [complexity, setComplexity] = useState<"simple" | "intermediate" | "complex">("intermediate");
   const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
   const [budgetType, setBudgetType] = useState<"fixed" | "hourly">("fixed");
   const [budgetAmount, setBudgetAmount] = useState("");
@@ -37,6 +40,9 @@ export default function EditProjectForm({ projectId }: { projectId: string }) {
       }
       setTitle(project.title);
       setDescription(project.description);
+      setCategory(project.category ?? "");
+      setLocation(project.location ?? "");
+      setComplexity(project.complexity ?? "intermediate");
       setSelectedSkills(project.skills);
       setBudgetType(project.budgetType);
       setBudgetAmount(String(project.budgetAmount));
@@ -84,7 +90,7 @@ export default function EditProjectForm({ projectId }: { projectId: string }) {
   };
 
   const handleSubmit = async () => {
-    if (!title.trim() || !description.trim() || selectedSkills.length === 0 || !budgetAmount) return;
+    if (!title.trim() || !description.trim() || !category || !location || selectedSkills.length === 0 || !budgetAmount) return;
     setIsSubmitting(true);
 
     try {
@@ -114,6 +120,9 @@ export default function EditProjectForm({ projectId }: { projectId: string }) {
       await updateProject(projectId, {
         title,
         description,
+        category,
+        location,
+        complexity,
         skills: selectedSkills,
         budgetType,
         budgetAmount: Number(budgetAmount),
@@ -173,6 +182,57 @@ export default function EditProjectForm({ projectId }: { projectId: string }) {
               onChange={(e) => setDescription(e.target.value)}
               className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none placeholder:text-[#97a4b3] focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
             />
+          </div>
+
+          {/* Skills */}
+          <div className="mb-5 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as Skill)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
+              >
+                <option value="" disabled>
+                  Select category
+                </option>
+                {AVAILABLE_SKILLS.map((skill) => (
+                  <option key={skill} value={skill}>
+                    {skill}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Location</label>
+              <select
+                value={location}
+                onChange={(e) => setLocation(e.target.value as Location)}
+                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
+              >
+                <option value="" disabled>
+                  Select location
+                </option>
+                {AVAILABLE_LOCATIONS.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Complexity</label>
+            <select
+              value={complexity}
+              onChange={(e) => setComplexity(e.target.value as "simple" | "intermediate" | "complex")}
+              className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
+            >
+              <option value="simple">Simple</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="complex">Complex</option>
+            </select>
           </div>
 
           {/* Skills */}
@@ -357,7 +417,15 @@ export default function EditProjectForm({ projectId }: { projectId: string }) {
             </button>
             <button
               onClick={handleSubmit}
-              disabled={isSubmitting || !title.trim() || !description.trim() || selectedSkills.length === 0 || !budgetAmount}
+              disabled={
+                isSubmitting ||
+                !title.trim() ||
+                !description.trim() ||
+                !category ||
+                !location ||
+                selectedSkills.length === 0 ||
+                !budgetAmount
+              }
               className="flex-1 rounded-lg bg-[#0d7cf2] py-3.5 text-sm font-semibold text-white transition hover:bg-[#0b6ad4] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isSubmitting ? uploadProgress || "Saving..." : "Save Changes"}

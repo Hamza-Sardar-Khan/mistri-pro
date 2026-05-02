@@ -1,25 +1,59 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPost } from "@/lib/actions/post";
 
 interface CreatePostModalProps {
   userAvatar: string;
   userName: string;
   onClose: () => void;
+  initialAction?: "photo" | "link" | null;
+  initialFile?: File | null;
+  initialPlaceholder?: string | null;
 }
 
 export default function CreatePostModal({
   userAvatar,
   userName,
   onClose,
+  initialAction,
+  initialFile,
+  initialPlaceholder,
 }: CreatePostModalProps) {
   const [content, setContent] = useState("");
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialAction === "photo") {
+      if (fileRef.current) {
+        fileRef.current.accept = "image/*";
+      }
+    }
+    if (initialAction === "link") {
+      setShowLinkInput(true);
+      setTimeout(() => linkInputRef.current?.focus(), 0);
+    } else {
+      setShowLinkInput(false);
+      setLinkUrl("");
+    }
+  }, [initialAction]);
+
+  useEffect(() => {
+    if (!initialFile) return;
+    setFile(initialFile);
+    const type = initialFile.type.startsWith("video") ? "video" : "image";
+    setMediaType(type);
+    const reader = new FileReader();
+    reader.onloadend = () => setMediaPreview(reader.result as string);
+    reader.readAsDataURL(initialFile);
+  }, [initialFile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
@@ -42,7 +76,8 @@ export default function CreatePostModal({
   };
 
   const handleSubmit = async () => {
-    if (!content.trim() && !file) return;
+    const nextContent = linkUrl ? `${content.trim()}\n${linkUrl}`.trim() : content.trim();
+    if (!nextContent && !file) return;
     setIsSubmitting(true);
 
     try {
@@ -69,7 +104,7 @@ export default function CreatePostModal({
         }
       }
 
-      await createPost({ content, imageUrl, videoUrl });
+      await createPost({ content: nextContent, imageUrl, videoUrl });
       onClose();
     } catch (err) {
       console.error(err);
@@ -119,12 +154,28 @@ export default function CreatePostModal({
           <textarea
             autoFocus
             rows={4}
-            placeholder="What's on your mind?"
+            placeholder={initialPlaceholder ?? "What's on your mind?"}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="w-full resize-none rounded-lg border-0 bg-transparent text-[15px] text-[#0e1724] placeholder-[#97a4b3] outline-none"
           />
         </div>
+
+        {showLinkInput && (
+          <div className="px-5 pb-3">
+            <label className="mb-2 block text-sm font-semibold text-[#2d3a4a]">
+              Link URL
+            </label>
+            <input
+              ref={linkInputRef}
+              type="url"
+              placeholder="https://"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-[#2d3a4a] focus:border-[#0d7cf2] focus:outline-none"
+            />
+          </div>
+        )}
 
         {/* Media preview */}
         {mediaPreview && (
@@ -188,6 +239,27 @@ export default function CreatePostModal({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               Video
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowLinkInput((prev) => !prev)}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-[#5e6d80] transition hover:bg-gray-100"
+            >
+              <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 14l4-4m-5 7l-2 2a4 4 0 01-5.656-5.656l2-2"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M14 10l2-2a4 4 0 015.656 5.656l-2 2"
+                />
+              </svg>
+              Link
             </button>
           </div>
 

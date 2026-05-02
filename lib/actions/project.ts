@@ -16,6 +16,9 @@ import type { Skill } from "@/lib/constants";
 export async function createProject(data: {
   title: string;
   description: string;
+  category: Skill;
+  location: string;
+  complexity: "simple" | "intermediate" | "complex";
   skills: Skill[];
   budgetType: "fixed" | "hourly";
   budgetAmount: number;
@@ -51,6 +54,9 @@ export async function createProject(data: {
         title: serialized.title,
         clientClerkId: user.id,
         clientName: serialized.clientName,
+        category: serialized.category,
+        location: serialized.location,
+        complexity: serialized.complexity,
         budgetType: serialized.budgetType,
         budgetAmount: serialized.budgetAmount,
         skills: serialized.skills,
@@ -216,6 +222,9 @@ export async function updateProject(
   data: {
     title: string;
     description: string;
+    category: Skill;
+    location: string;
+    complexity: "simple" | "intermediate" | "complex";
     skills: Skill[];
     budgetType: "fixed" | "hourly";
     budgetAmount: number;
@@ -235,6 +244,9 @@ export async function updateProject(
 
   project.title = data.title;
   project.description = data.description;
+  project.category = data.category;
+  project.location = data.location;
+  project.complexity = data.complexity;
   project.skills = data.skills;
   project.budgetType = data.budgetType;
   project.budgetAmount = data.budgetAmount;

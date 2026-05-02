@@ -30,6 +30,14 @@ export interface IPost extends Document {
   content: string;
   imageUrl?: string;
   videoUrl?: string;
+  repostOriginal?: {
+    authorName: string;
+    authorAvatar: string;
+    content: string;
+    imageUrl?: string;
+    videoUrl?: string;
+    createdAt: Date;
+  };
   reactions: IReaction[];
   comments: IComment[];
   createdAt: Date;
@@ -76,6 +84,14 @@ const PostSchema = new Schema<IPost>(
     content: { type: String, default: "" },
     imageUrl: { type: String },
     videoUrl: { type: String },
+    repostOriginal: {
+      authorName: { type: String },
+      authorAvatar: { type: String },
+      content: { type: String },
+      imageUrl: { type: String },
+      videoUrl: { type: String },
+      createdAt: { type: Date },
+    },
     reactions: [ReactionSchema],
     comments: [CommentSchema],
   },

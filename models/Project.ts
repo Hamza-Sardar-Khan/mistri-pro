@@ -7,6 +7,9 @@ export interface IProject extends Document {
   clientAvatar: string;
   title: string;
   description: string;
+  category: Skill;
+  location: string;
+  complexity: "simple" | "intermediate" | "complex";
   skills: Skill[];
   budgetType: "fixed" | "hourly";
   budgetAmount: number;
@@ -25,6 +28,9 @@ const ProjectSchema = new Schema<IProject>(
     clientAvatar: { type: String, default: "" },
     title: { type: String, required: true },
     description: { type: String, required: true },
+    category: { type: String, required: true },
+    location: { type: String, required: true },
+    complexity: { type: String, enum: ["simple", "intermediate", "complex"], default: "intermediate" },
     skills: [{ type: String }],
     budgetType: { type: String, enum: ["fixed", "hourly"], required: true },
     budgetAmount: { type: Number, required: true },
@@ -37,6 +43,8 @@ const ProjectSchema = new Schema<IProject>(
 );
 
 ProjectSchema.index({ skills: 1 });
+ProjectSchema.index({ category: 1 });
+ProjectSchema.index({ location: 1 });
 ProjectSchema.index({ status: 1, createdAt: -1 });
 
 const Project = models.Project || model<IProject>("Project", ProjectSchema);

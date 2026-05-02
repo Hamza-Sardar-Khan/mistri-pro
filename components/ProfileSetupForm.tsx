@@ -11,12 +11,30 @@ interface ProfileSetupFormProps {
     lastName: string;
     avatarUrl: string;
   };
+  initialProfile?: {
+    title: string;
+    bio: string;
+    hourlyRate: number;
+    phone: string;
+    city: string;
+    country: string;
+    skills: Skill[];
+    education: string;
+    experience: string;
+    languages: string[];
+  };
+  mode?: "create" | "edit";
 }
 
-export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps) {
+export default function ProfileSetupForm({
+  initialData,
+  initialProfile,
+  mode = "create",
+}: ProfileSetupFormProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(initialData.avatarUrl);
   const [avatarUrl, setAvatarUrl] = useState(initialData.avatarUrl);
   const [step, setStep] = useState(1);
@@ -24,17 +42,21 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
   const [form, setForm] = useState({
     firstName: initialData.firstName,
     lastName: initialData.lastName,
-    title: "",
-    bio: "",
-    hourlyRate: 0,
-    phone: "",
-    city: "",
-    country: "Pakistan",
-    education: "",
-    experience: "",
-    languages: ["English", "Urdu"],
+    title: initialProfile?.title ?? "",
+    bio: initialProfile?.bio ?? "",
+    hourlyRate: initialProfile?.hourlyRate ?? 0,
+    phone: initialProfile?.phone ?? "",
+    city: initialProfile?.city ?? "",
+    country: initialProfile?.country ?? "Pakistan",
+    education: initialProfile?.education ?? "",
+    experience: initialProfile?.experience ?? "",
+    languages: initialProfile?.languages?.length
+      ? initialProfile.languages
+      : ["English", "Urdu"],
   });
-  const [selectedSkills, setSelectedSkills] = useState<Skill[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<Skill[]>(
+    initialProfile?.skills ?? []
+  );
   const [languageInput, setLanguageInput] = useState("");
 
   const hashtag = `@${form.firstName}${form.lastName}`.toLowerCase().replace(/\s+/g, "");
@@ -44,13 +66,22 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
     if (!file) return;
 
     setAvatarPreview(URL.createObjectURL(file));
+    setIsUploading(true);
 
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (data.url) setAvatarUrl(data.url);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      if (data.url) setAvatarUrl(data.url);
+    } catch {
+      alert("Avatar upload failed. Please try again.");
+      setAvatarPreview(avatarUrl);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const toggleSkill = (skill: Skill) => {
@@ -94,7 +125,7 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
         experience: form.experience,
         languages: form.languages,
       });
-      router.push("/dashboard");
+      router.push(mode === "edit" ? "/profile" : "/dashboard");
     } catch {
       setLoading(false);
     }
@@ -133,10 +164,12 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
 
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 sm:p-8">
           <h1 className="text-2xl font-extrabold text-[#0e1724] mb-1">
-            Complete Your Profile
+            {mode === "edit" ? "Edit Your Profile" : "Complete Your Profile"}
           </h1>
           <p className="text-sm text-[#5e6d80] mb-6">
-            Set up your professional profile to start getting hired
+            {mode === "edit"
+              ? "Update your details to keep your profile fresh"
+              : "Set up your professional profile to start getting hired"}
           </p>
 
           {/* Step 1: Basic Info */}
@@ -244,13 +277,14 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
                 </div>
               </div>
 
-              <button
+                <button
                 onClick={() => {
                   if (form.firstName.trim()) setStep(2);
                 }}
-                className="w-full mt-2 bg-[#0d7cf2] hover:bg-[#0b6ad4] text-white font-semibold py-3 rounded-xl transition"
+                  disabled={isUploading}
+                  className="w-full mt-2 bg-[#0d7cf2] hover:bg-[#0b6ad4] text-white font-semibold py-3 rounded-xl transition disabled:opacity-60"
               >
-                Continue
+                  {isUploading ? "Uploading..." : "Continue"}
               </button>
             </div>
           )}
@@ -455,7 +489,7 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
                 </button>
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || selectedSkills.length === 0}
+                  disabled={loading || isUploading || selectedSkills.length === 0}
                   className="flex-1 bg-[#0d7cf2] hover:bg-[#0b6ad4] text-white font-semibold py-3 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
@@ -466,6 +500,10 @@ export default function ProfileSetupForm({ initialData }: ProfileSetupFormProps)
                       </svg>
                       Saving...
                     </span>
+                  ) : isUploading ? (
+                    "Uploading..."
+                  ) : mode === "edit" ? (
+                    "Save Changes"
                   ) : (
                     "Complete Profile"
                   )}

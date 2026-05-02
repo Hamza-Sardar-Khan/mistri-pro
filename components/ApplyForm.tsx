@@ -158,6 +158,9 @@ export default function ApplyForm({ projectId, projectTitle }: { projectId: stri
                 className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm text-[#0e1724] outline-none focus:border-[#0d7cf2] focus:ring-1 focus:ring-[#0d7cf2]"
               />
             </div>
+          </div>
+
+          <div className="mb-6 grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-semibold text-[#0e1724] mb-1.5">Duration</label>
               <input

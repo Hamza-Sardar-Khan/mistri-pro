@@ -13,7 +13,7 @@ export default async function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4">
       {/* Hero */}
-      <div className="text-center">
+      <div className="pt-16 text-center">
         {/* Logo Text — replace with <Image> later */}
         <h1 className="mb-2 text-6xl font-extrabold tracking-tight sm:text-8xl">
           <span className="text-[#0e1724]">
@@ -43,10 +43,66 @@ export default async function LandingPage() {
             </button>
           </SignUpButton>
         </div>
+
+        <div className="mx-auto mt-14 w-full max-w-3xl">
+          <div className="border-t border-slate-200" />
+          <div className="py-8 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9aa5b1]">
+              Trusted by top professionals worldwide
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-6 text-xs font-semibold uppercase tracking-[0.2em] text-[#9aa5b1]">
+              <span>Buildcore</span>
+              <span>Skyline</span>
+              <span>Terra</span>
+              <span>Equinox</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mx-auto mt-6 w-full max-w-5xl border-t border-slate-200 bg-slate-50 px-8 py-10 text-left">
+          <div className="grid gap-8 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
+            <div>
+              <div className="flex items-center gap-2 text-sm font-semibold text-blue-600">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-white">
+                  <span className="h-3 w-3 rounded-[3px] border-2 border-blue-500" />
+                </span>
+                MISTRI PRO
+              </div>
+              <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                The premier marketplace for connecting talented professionals
+                with high-impact projects.
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Platform</p>
+              <div className="mt-3 space-y-2 text-xs">
+                <p>Browse Projects</p>
+                <p>Find Professionals</p>
+                <p>Success Stories</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Company</p>
+              <div className="mt-3 space-y-2 text-xs">
+                <p>About Us</p>
+                <p>Careers</p>
+                <p>Contact</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">Resources</p>
+              <div className="mt-3 space-y-2 text-xs">
+                <p>Help Center</p>
+                <p>Community Guidelines</p>
+                <p>Trust &amp; Safety</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Footer tagline */}
-      <p className="mt-20 text-sm text-[#97a4b3]">
+      <p className="mt-12 text-sm text-[#97a4b3]">
         &copy; {new Date().getFullYear()} Mistri Pro. All rights reserved.
       </p>
     </div>

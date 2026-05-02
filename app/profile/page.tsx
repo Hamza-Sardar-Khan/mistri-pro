@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getMyProfile } from "@/lib/actions/user";
 import Link from "next/link";
+import AppFooter from "@/components/AppFooter";
 
 export const dynamic = "force-dynamic";
 
@@ -93,13 +94,20 @@ export default async function ProfilePage() {
 
               <div className="flex-1 sm:pb-1">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
+                  <div className="space-y-1">
                     <h2 className="text-2xl font-extrabold text-[#0e1724]">
                       {profile.firstName} {profile.lastName}
                     </h2>
                     <p className="text-sm font-medium text-[#0d7cf2]">{profile.hashtag}</p>
+                    <p className="text-base text-[#5e6d80]">{profile.title}</p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 sm:mt-24">
+                    <Link
+                      href="/profile/edit"
+                      className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-[#0e1724] transition hover:bg-gray-50"
+                    >
+                      Edit Profile
+                    </Link>
                     <div className="flex items-center gap-1.5 rounded-full bg-yellow-50 border border-yellow-200 px-3 py-1.5">
                       <svg className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -109,30 +117,51 @@ export default async function ProfilePage() {
                     </div>
                   </div>
                 </div>
-                <p className="text-base text-[#5e6d80] mt-1">{profile.title}</p>
+                <div className="hidden" />
               </div>
             </div>
 
             {/* Quick Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
-                <p className="text-xs text-[#97a4b3] mb-0.5">Hourly Rate</p>
+                <p className="inline-flex items-center gap-1 text-xs text-[#97a4b3] mb-0.5">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 8c-2.21 0-4 1.79-4 4m4-4c2.21 0 4 1.79 4 4m-4-4V6m0 12v-2m7-4h-2M7 12H5" />
+                  </svg>
+                  Hourly Rate
+                </p>
                 <p className="text-lg font-bold text-[#0e1724]">
                   {profile.hourlyRate > 0 ? `₨${profile.hourlyRate}` : "—"}
                 </p>
               </div>
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
-                <p className="text-xs text-[#97a4b3] mb-0.5">Location</p>
+                <p className="inline-flex items-center gap-1 text-xs text-[#97a4b3] mb-0.5">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 21s6-5.373 6-10a6 6 0 10-12 0c0 4.627 6 10 6 10z" />
+                    <circle cx="12" cy="11" r="2.5" strokeWidth={1.6} />
+                  </svg>
+                  Location
+                </p>
                 <p className="text-sm font-semibold text-[#0e1724] truncate">
                   {profile.city || "—"}{profile.city && profile.country ? `, ${profile.country}` : ""}
                 </p>
               </div>
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
-                <p className="text-xs text-[#97a4b3] mb-0.5">Jobs Done</p>
+                <p className="inline-flex items-center gap-1 text-xs text-[#97a4b3] mb-0.5">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 6h6l1 2h4v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8h4l1-2z" />
+                  </svg>
+                  Jobs Done
+                </p>
                 <p className="text-lg font-bold text-[#0e1724]">12</p>
               </div>
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-3 text-center">
-                <p className="text-xs text-[#97a4b3] mb-0.5">Member Since</p>
+                <p className="inline-flex items-center gap-1 text-xs text-[#97a4b3] mb-0.5">
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M8 7V5m8 2V5M4 9h16M6 12h4m-4 4h3m6-4h3m-3 4h2" />
+                  </svg>
+                  Member Since
+                </p>
                 <p className="text-sm font-semibold text-[#0e1724]">
                   {new Date(profile.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
                 </p>
@@ -318,6 +347,7 @@ export default async function ProfilePage() {
           </div>
         </div>
       </main>
+      <AppFooter />
     </div>
   );
 }
