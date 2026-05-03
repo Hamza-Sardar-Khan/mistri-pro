@@ -1,5 +1,6 @@
 import { SignInButton, SignUpButton } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 export default async function LandingPage() {
@@ -62,12 +63,16 @@ export default async function LandingPage() {
         <div className="mx-auto mt-6 w-full max-w-5xl border-t border-slate-200 bg-slate-50 px-8 py-10 text-left">
           <div className="grid gap-8 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
             <div>
-              <div className="flex items-center gap-2 text-sm font-semibold text-blue-600">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-blue-200 bg-white">
-                  <span className="h-3 w-3 rounded-[3px] border-2 border-blue-500" />
-                </span>
-                MISTRI PRO
-              </div>
+          <div className="flex flex-col gap-2">
+                    <Image
+                      src="/logo.png"
+                      alt="Mistri Pro"
+                      width={70}
+                      height={36}
+                      objectFit="contain"
+                      className="h-8 w-auto scale-300 2xl:scale-500 object-contain"
+                    />
+            </div>
               <p className="mt-3 text-xs leading-relaxed text-slate-500">
                 The premier marketplace for connecting talented professionals
                 with high-impact projects.

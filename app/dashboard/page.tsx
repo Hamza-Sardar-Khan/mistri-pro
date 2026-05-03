@@ -1,11 +1,13 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { syncAndCheckProfile } from "@/lib/actions/user";
+import { getMyFollowingIds, getTopUserSummaries, getUserSummariesByIds, syncAndCheckProfile } from "@/lib/actions/user";
 import { getPosts } from "@/lib/actions/post";
 import { getTrendingProjectSkills } from "@/lib/actions/project";
 import CreatePostPrompt from "@/components/CreatePostPrompt";
 import PostCard from "@/components/PostCard";
+import FollowButton from "@/components/FollowButton";
 import Link from "next/link";
+import { Bookmark, Briefcase, Home, MapPin, MessageSquare, Settings } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -62,48 +64,93 @@ export default async function DashboardPage() {
   const dbAvatar = result.user?.avatarUrl ?? "";
   const dashboardPosts = posts as DashboardPost[];
 
-  const followSuggestions: { name: string; clerkUserId: string }[] = dashboardPosts
-    .reduce(
-      (acc: { name: string; clerkUserId: string }[], post) => {
-        if (!post.authorClerkId || post.authorClerkId === user.id) {
-          return acc;
-        }
-
-        if (!acc.find((item) => item.clerkUserId === post.authorClerkId)) {
-          acc.push({
-            name: post.authorName || "Anonymous",
-            clerkUserId: post.authorClerkId,
-          });
-        }
-        return acc;
-      },
-      []
+  const suggestionIds = Array.from(
+    new Set(
+      dashboardPosts
+        .map((post) => post.authorClerkId)
+        .filter((id): id is string => Boolean(id) && id !== user.id)
     )
-    .slice(0, 3);
+  ).slice(0, 6);
+
+  const [followSuggestions, myFollowingIds] = await Promise.all([
+    getUserSummariesByIds(suggestionIds),
+    getMyFollowingIds(),
+  ]);
+
+  const fallbackSuggestions =
+    followSuggestions.length === 0 ? await getTopUserSummaries(5, user.id) : [];
+  const suggestionsToShow =
+    followSuggestions.length > 0 ? followSuggestions : fallbackSuggestions;
 
   return (
     <div className="min-h-screen bg-[#f5f7fa]">
       <main className="mx-auto w-full max-w-6xl px-4 py-6">
         <div className="grid gap-6 lg:grid-cols-[220px_1fr_260px]">
-          <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start">
-            <nav className="space-y-2 text-sm">
-              <Link className="flex items-center gap-2 rounded-xl bg-[#e9f2ff] px-4 py-2 font-semibold text-[#0d7cf2]" href="/dashboard">
-                <span className="h-2 w-2 rounded-full bg-[#0d7cf2]" />
+         <aside className="hidden lg:block lg:sticky lg:top-20 lg:self-start w-59 pr-4">
+            <nav className="space-y-1 text-sm font-medium">
+              
+              {/* Active Link */}
+              <Link 
+                href="/dashboard" 
+                className="flex items-center gap-3 rounded-xl bg-[#0d7cf2] px-4 py-3 font-semibold text-[white] transition-colors duration-200"
+              >
+                <Home className="h-5 w-5 text-[white]" strokeWidth={2.5} />
                 Home Feed
               </Link>
-              <Link className="flex items-center gap-2 rounded-xl px-4 py-2 text-[#5e6d80] hover:bg-white" href="/projects/mine">
-                <span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />
+
+              {/* Inactive Links */}
+              <Link 
+                href="/projects/mine" 
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-[#5e6d80] transition-colors duration-200 hover:bg-white hover:text-gray-900"
+              >
+                <Briefcase className="h-5 w-5 text-[#cbd5e1]" strokeWidth={2} />
                 My Projects
               </Link>
-              <Link className="flex items-center gap-2 rounded-xl px-4 py-2 text-[#5e6d80] hover:bg-white" href="/projects/saved">
-                <span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />
+
+              <Link 
+                href="/projects/saved" 
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-[#5e6d80] transition-colors duration-200 hover:bg-white hover:text-gray-900"
+              >
+                <Bookmark className="h-5 w-5 text-[#cbd5e1]" strokeWidth={2} />
                 Saved Projects
               </Link>
-              <Link className="flex items-center gap-2 rounded-xl px-4 py-2 text-[#5e6d80] hover:bg-white" href="/projects">
-                <span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />
+
+              <Link 
+                href="/projects" 
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-[#5e6d80] transition-colors duration-200 hover:bg-white hover:text-gray-900"
+              >
+                <MapPin  className="h-5 w-5 text-[#cbd5e1]" strokeWidth={2} />
                 Local Jobs
               </Link>
+
+              {/* Recommended Additions */}
+              <Link 
+                href="/inbox" 
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-[#5e6d80] transition-colors duration-200 hover:bg-white hover:text-gray-900"
+              >
+                <MessageSquare className="h-5 w-5 text-[#cbd5e1]" strokeWidth={2} />
+                Messages
+              </Link>
+
+              <Link 
+                href="/profile/edit" 
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-[#5e6d80] transition-colors duration-200 hover:bg-white hover:text-gray-900"
+              >
+                <Settings className="h-5 w-5 text-[#cbd5e1]" strokeWidth={2} />
+                Settings
+              </Link>
+              
             </nav>
+
+            {/* Optional Bottom Section */}
+            <div className="mt-8 border-t border-gray-200 pt-8">
+              <Link 
+                href="/help" 
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-[#5e6d80] transition-colors duration-200 hover:bg-white hover:text-gray-900"
+              >
+                Help & Support
+              </Link>
+            </div>
           </aside>
 
           <section>
@@ -160,15 +207,24 @@ export default async function DashboardPage() {
                 {trendingSkills.length === 0 ? (
                   <p className="text-xs text-[#97a4b3]">No trends yet.</p>
                 ) : (
-                  trendingSkills.map((item) => (
-                    <Link
-                      key={item.skill}
-                      href={`/projects?category=${encodeURIComponent(item.skill)}`}
-                      className="block rounded-lg px-2 py-1.5 transition hover:bg-gray-50"
-                    >
-                      <p className="font-semibold text-[#0e1724]">{item.skill}</p>
-                      <p className="text-xs">{item.count} open job{item.count === 1 ? "" : "s"}</p>
-                    </Link>
+                  trendingSkills.map((item, index) => (
+                    <div key={item.skill}>
+                      <Link
+                        href={`/projects?category=${encodeURIComponent(item.skill)}`}
+                        className="block rounded-lg px-2 py-1 transition hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="text-lg font-semibold text-[#1f2937]">#</span>
+                          <p className="font-semibold text-[#0e1724]">{item.skill}</p>
+                        </div>
+                        <p className="text-xs">{item.count} open job{item.count === 1 ? "" : "s"}</p>
+                      </Link>
+                      {index < trendingSkills.length - 1 && (
+                        <div className="px-2">
+                          <div className="h-px bg-[#eef2f7]" />
+                        </div>
+                      )}
+                    </div>
                   ))
                 )}
               </div>
@@ -177,21 +233,33 @@ export default async function DashboardPage() {
             <div className="rounded-xl border border-gray-200 bg-white p-4">
               <h3 className="text-sm font-semibold text-[#0e1724]">Who to follow</h3>
               <div className="mt-3 space-y-3 text-sm text-[#5e6d80]">
-                {followSuggestions.length === 0 ? (
+                {suggestionsToShow.length === 0 ? (
                   <p className="text-xs text-[#97a4b3]">More people to follow soon.</p>
                 ) : (
-                  followSuggestions.map((suggestion) => (
-                    <div key={suggestion.clerkUserId} className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-[#0e1724]">{suggestion.name}</p>
-                        <p className="text-xs">Recently active</p>
-                      </div>
-                      <Link
-                        href={`/profile/${suggestion.clerkUserId}`}
-                        className="rounded-full border border-gray-200 px-3 py-1 text-xs font-semibold text-[#0d7cf2]"
-                      >
-                        View
+                  suggestionsToShow.map((suggestion) => (
+                    <div key={suggestion.clerkUserId} className="flex items-center justify-between gap-3">
+                      <Link href={`/profile/${suggestion.clerkUserId}`} className="flex items-center gap-3">
+                        {suggestion.avatarUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={suggestion.avatarUrl}
+                            alt={suggestion.name}
+                            className="h-9 w-9 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0d7cf2] text-xs font-bold text-white">
+                            {suggestion.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-semibold text-[#0e1724]">{suggestion.name}</p>
+                          <p className="text-xs text-[#97a4b3]">{suggestion.followersCount} followers</p>
+                        </div>
                       </Link>
+                      <FollowButton
+                        targetUserId={suggestion.clerkUserId}
+                        initialIsFollowing={myFollowingIds.includes(suggestion.clerkUserId)}
+                      />
                     </div>
                   ))
                 )}

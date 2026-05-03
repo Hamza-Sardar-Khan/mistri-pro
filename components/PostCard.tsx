@@ -15,8 +15,8 @@ import {
 
 /* ── Reaction config ── */
 const REACTIONS = [
-  { type: "like", emoji: "❤️", label: "Like" },
-  { type: "love", emoji: "🔥", label: "Love" },
+  { type: "like", emoji: "❤️", label: "Love" },
+  { type: "love", emoji: "🔥", label: "Fire" },
   { type: "haha", emoji: "🤣", label: "Haha" },
   { type: "wow", emoji: "😱", label: "Wow" },
   { type: "sad", emoji: "😟", label: "Sad" },
@@ -124,12 +124,20 @@ function ReactionBadges({
   for (const r of reactions) {
     counts[r.type] = (counts[r.type] || 0) + 1;
   }
-  const topReaction = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-  const emoji = REACTION_MAP[topReaction]?.emoji ?? "❤️";
+  const topReactions = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([type]) => REACTION_MAP[type]?.emoji)
+    .filter((value): value is string => Boolean(value));
+  const emojis = topReactions.length > 0 ? topReactions : ["❤️"];
   return (
     <button onClick={onClick} className="flex items-center gap-1 hover:underline">
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#e9f2ff] text-[#0d7cf2]">
-        <span className="text-xs">{emoji}</span>
+      <span className="inline-flex items-center rounded-full bg-[#e9f2ff] px-1 text-[#0d7cf2]">
+        {emojis.map((item, index) => (
+          <span key={`${item}-${index}`} className="text-xs">
+            {item}
+          </span>
+        ))}
       </span>
       <span>{reactions.length}</span>
     </button>
@@ -445,6 +453,10 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
   const [showRepostModal, setShowRepostModal] = useState(false);
   const [repostText, setRepostText] = useState("");
   const [isReposting, setIsReposting] = useState(false);
+  const [isVideoMuted, setIsVideoMuted] = useState(true);
+  const [isRepostVideoMuted, setIsRepostVideoMuted] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const repostVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Reactions
   const [reactions, setReactions] = useState<Reaction[]>(post.reactions ?? []);
@@ -640,14 +652,51 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
           )}
           {post.repostOriginal.videoUrl && (
             <div className="mt-3">
-              <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "16/9" }}>
-                <video
-                  src={post.repostOriginal.videoUrl}
-                  controls
-                  preload="none"
-                  className="absolute inset-0 h-full w-full object-contain"
-                />
-              </div>
+              <div className="w-full">
+                <div className="group relative w-full overflow-hidden bg-transparent" style={{ aspectRatio: "16/9" }}>
+                    <video
+                      ref={repostVideoRef}
+                      src={post.repostOriginal.videoUrl}
+                      autoPlay
+                      muted={isRepostVideoMuted}
+                      loop
+                      playsInline
+                      preload="auto"
+                      className="absolute inset-0 h-full w-full object-cover object-center"
+                      onClick={(event) => {
+                        const video = event.currentTarget;
+                        if (video.paused) void video.play();
+                        else video.pause();
+                      }}
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_55%)]" />
+                    <div className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/25" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextMuted = !isRepostVideoMuted;
+                        setIsRepostVideoMuted(nextMuted);
+                        if (repostVideoRef.current) repostVideoRef.current.muted = nextMuted;
+                      }}
+                      className="absolute bottom-3 right-3 rounded-full bg-black/55 p-2 text-white opacity-0 transition hover:bg-black/75 group-hover:opacity-100"
+                      aria-label={isRepostVideoMuted ? "Unmute video" : "Mute video"}
+                    >
+                      {isRepostVideoMuted ? (
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                          <line x1="23" y1="9" x2="17" y2="15" />
+                          <line x1="17" y1="9" x2="23" y2="15" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                          <path d="M15.5 8.5a4 4 0 010 7" />
+                          <path d="M19 5a8 8 0 010 14" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
             </div>
           )}
         </div>
@@ -660,9 +709,49 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
         </div>
       )}
       {post.videoUrl && !post.repostOriginal && (
-        <div className="px-5 pb-2">
-          <div className="relative w-full overflow-hidden rounded-lg bg-black" style={{ aspectRatio: "16/9" }}>
-            <video src={post.videoUrl} controls preload="none" className="absolute inset-0 h-full w-full object-contain" />
+        <div className="px-0 pb-0">
+          <div className="group relative w-full overflow-hidden bg-transparent" style={{ aspectRatio: "16/9" }}>
+            <video
+              ref={videoRef}
+              src={post.videoUrl}
+              autoPlay
+              muted={isVideoMuted}
+              loop
+              playsInline
+              preload="auto"
+              className="absolute inset-0 h-full w-full object-cover object-center"
+              onClick={(event) => {
+                const video = event.currentTarget;
+                if (video.paused) void video.play();
+                else video.pause();
+              }}
+            />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_55%)]" />
+            <div className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/25" />
+            <button
+              type="button"
+              onClick={() => {
+                const nextMuted = !isVideoMuted;
+                setIsVideoMuted(nextMuted);
+                if (videoRef.current) videoRef.current.muted = nextMuted;
+              }}
+              className="absolute bottom-3 right-3 rounded-full bg-black/55 p-2 text-white opacity-0 transition hover:bg-black/75 group-hover:opacity-100"
+              aria-label={isVideoMuted ? "Unmute video" : "Mute video"}
+            >
+              {isVideoMuted ? (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                  <path d="M15.5 8.5a4 4 0 010 7" />
+                  <path d="M19 5a8 8 0 010 14" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
       )}
@@ -704,15 +793,24 @@ export default function PostCard({ post, currentUserId }: PostCardProps) {
               myReaction ? "text-[#0d7cf2]" : "text-[#5e6d80]"
             }`}
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.6}
-                d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21l-7.682-8.318a4.5 4.5 0 010-6.364z"
-              />
-            </svg>
-            Like
+            {myReaction ? (
+              <>
+                <span className="text-base">{REACTION_MAP[myReaction.type]?.emoji ?? "❤️"}</span>
+                <span>{REACTION_MAP[myReaction.type]?.label ?? "Like"}</span>
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.6}
+                    d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 21l-7.682-8.318a4.5 4.5 0 010-6.364z"
+                  />
+                </svg>
+                Like
+              </>
+            )}
           </button>
         </div>
 
