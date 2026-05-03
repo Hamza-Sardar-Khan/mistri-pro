@@ -260,6 +260,7 @@ export async function sendMessage(data: {
   conversationId: string;
   text: string;
   attachments?: MessageAttachmentInput[];
+  clientId?: string;
 }) {
   const user = await currentUser();
   if (!user) throw new Error("Unauthorized");
@@ -299,6 +300,11 @@ export async function sendMessage(data: {
     attachments,
   });
 
+  if (!message.deliveredAt) {
+    message.deliveredAt = new Date();
+    await message.save();
+  }
+
   conversation.lastMessage = cleanText || attachmentPreview(attachments[0]);
   conversation.lastMessageAt = message.createdAt;
   if (!conversation.participantIds || conversation.participantIds.length === 0) {
@@ -314,6 +320,7 @@ export async function sendMessage(data: {
     pusher.trigger(`conversation-${conversation._id.toString()}`, "new-message", {
       message: serializedMessage,
       conversation: serializedConversation,
+      clientId: data.clientId ?? null,
     }),
     pusher.trigger(`user-${recipientClerkId}`, "new-notification", {
       id: `message-${serializedMessage._id}`,
@@ -334,5 +341,30 @@ export async function sendMessage(data: {
   return {
     conversation: serializedConversation,
     message: serializedMessage,
+    clientId: data.clientId ?? null,
   };
+}
+
+export async function markMessageDelivered(messageId: string) {
+  const user = await currentUser();
+  if (!user) throw new Error("Unauthorized");
+
+  await connectDB();
+
+  const message = await Message.findById(messageId);
+  if (!message) throw new Error("Message not found");
+  if (message.recipientClerkId !== user.id) throw new Error("Forbidden");
+
+  if (!message.deliveredAt) {
+    message.deliveredAt = new Date();
+    await message.save();
+  }
+
+  const pusher = getPusherServer();
+  await pusher.trigger(`conversation-${message.conversationId.toString()}`, "message-delivered", {
+    messageId: message._id.toString(),
+    deliveredAt: message.deliveredAt?.toISOString(),
+  });
+
+  return { messageId: message._id.toString(), deliveredAt: message.deliveredAt?.toISOString() };
 }

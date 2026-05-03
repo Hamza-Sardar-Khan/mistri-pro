@@ -22,9 +22,9 @@ export default function ProjectsDropdown() {
       onMouseEnter={show}
       onMouseLeave={hide}
     >
-      <button className="flex items-center gap-1 text-sm font-medium text-[#5e6d80] hover:text-[#0d7cf2] transition py-2">
+      <button className="flex items-center gap-1 text-base font-medium text-white transition py-2">
         Projects
-        <svg className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>

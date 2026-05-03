@@ -7,6 +7,8 @@ export interface IUser extends Document {
   lastName: string;
   avatarUrl: string;
   profileComplete: boolean;
+  followers: string[];
+  following: string[];
   hashtag: string;
   title: string;
   bio: string;
@@ -27,6 +29,8 @@ const UserSchema = new Schema<IUser>(
     lastName: { type: String, default: "" },
     avatarUrl: { type: String, default: "" },
     profileComplete: { type: Boolean, default: false },
+    followers: [{ type: String }],
+    following: [{ type: String }],
     hashtag: { type: String, default: "" },
     title: { type: String, default: "" },
     bio: { type: String, default: "" },

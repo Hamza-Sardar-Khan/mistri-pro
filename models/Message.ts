@@ -16,6 +16,7 @@ export interface IMessage extends Document {
     size: number;
   }[];
   readAt?: Date;
+  deliveredAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +40,7 @@ const MessageSchema = new Schema<IMessage>(
       },
     ],
     readAt: { type: Date },
+    deliveredAt: { type: Date },
   },
   { timestamps: true }
 );

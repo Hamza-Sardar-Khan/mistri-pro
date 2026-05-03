@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getConversationById,
   getConversationMessages,
+  markMessageDelivered,
   sendMessage,
 } from "@/lib/actions/chat";
 import { getPusherClient } from "@/lib/pusher-client";
@@ -57,10 +58,19 @@ interface Message {
   senderClerkId: string;
   senderName: string;
   senderAvatar: string;
+  recipientClerkId: string;
   text: string;
   attachments?: Attachment[];
+  deliveredAt?: string;
   createdAt: string;
 }
+
+type DeliveryStatus = "sent" | "delivered";
+
+type LocalMessage = Message & {
+  localId?: string;
+  deliveryStatus?: DeliveryStatus;
+};
 
 interface Props {
   currentUserId: string;
@@ -122,6 +132,24 @@ function otherPerson(conversation: Conversation, currentUserId: string) {
     name: conversation.clientName,
     avatar: conversation.clientAvatar,
   };
+}
+
+function currentUserIdentity(conversation: Conversation, currentUserId: string) {
+  if (conversation.clientClerkId === currentUserId) {
+    return {
+      name: conversation.clientName,
+      avatar: conversation.clientAvatar,
+    };
+  }
+  return {
+    name: conversation.workerName,
+    avatar: conversation.workerAvatar,
+  };
+}
+
+function deliveryStatusFor(message: Message, currentUserId: string): DeliveryStatus | undefined {
+  if (message.senderClerkId !== currentUserId) return undefined;
+  return message.deliveredAt ? "delivered" : "sent";
 }
 
 function sortConversations(conversations: Conversation[]) {
@@ -359,7 +387,7 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
       ? initialConversations.find((item) => item._id === searchParams.get("conversation")) ?? null
       : null
   );
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
   const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
@@ -415,7 +443,14 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
     setLoadingMessages(true);
     getConversationMessages(activeId)
       .then((items) => {
-        if (active) setMessages(items as unknown as Message[]);
+        if (!active) return;
+        const typed = items as unknown as Message[];
+        setMessages(
+          typed.map((message) => ({
+            ...message,
+            deliveryStatus: deliveryStatusFor(message, currentUserId),
+          }))
+        );
       })
       .finally(() => {
         if (active) setLoadingMessages(false);
@@ -431,26 +466,57 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
     const subscriptions = conversations.map((conversation) => {
       const channelName = `conversation-${conversation._id}`;
       const channel = pusher.subscribe(channelName);
-      const handleNewMessage = (payload: { message: Message; conversation: Conversation }) => {
+      const handleNewMessage = (payload: {
+        message: Message;
+        conversation: Conversation;
+        clientId?: string | null;
+      }) => {
         upsertConversation(payload.conversation);
         if (payload.conversation._id === activeId) {
           setMessages((prev) => {
-            if (prev.some((message) => message._id === payload.message._id)) return prev;
-            return [...prev, payload.message];
+            const filtered = payload.clientId
+              ? prev.filter((message) => message.localId !== payload.clientId && message._id !== payload.clientId)
+              : prev;
+            if (filtered.some((message) => message._id === payload.message._id)) return filtered;
+            return [
+              ...filtered,
+              {
+                ...payload.message,
+                deliveryStatus: deliveryStatusFor(payload.message, currentUserId),
+              },
+            ];
           });
         }
+        if (payload.message.recipientClerkId === currentUserId) {
+          markMessageDelivered(payload.message._id).catch((error) => console.error(error));
+        }
+      };
+      const handleMessageDelivered = (payload: { messageId: string; deliveredAt?: string }) => {
+        if (!payload.messageId) return;
+        setMessages((prev) =>
+          prev.map((message) => {
+            if (message._id !== payload.messageId) return message;
+            return {
+              ...message,
+              deliveredAt: payload.deliveredAt ?? message.deliveredAt,
+              deliveryStatus: "delivered",
+            };
+          })
+        );
       };
       channel.bind("new-message", handleNewMessage);
-      return { channelName, channel, handleNewMessage };
+      channel.bind("message-delivered", handleMessageDelivered);
+      return { channelName, channel, handleNewMessage, handleMessageDelivered };
     });
 
     return () => {
-      subscriptions.forEach(({ channelName, channel, handleNewMessage }) => {
+      subscriptions.forEach(({ channelName, channel, handleNewMessage, handleMessageDelivered }) => {
         channel.unbind("new-message", handleNewMessage);
+        channel.unbind("message-delivered", handleMessageDelivered);
         pusher.unsubscribe(channelName);
       });
     };
-  }, [conversations, activeId, upsertConversation]);
+  }, [conversations, activeId, upsertConversation, currentUserId]);
 
   useEffect(() => {
     const pusher = getPusherClient();
@@ -625,6 +691,25 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
     if (!text && pendingAttachments.length === 0) return;
 
     const attachmentsToUpload = pendingAttachments;
+    const clientId = `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const identity = currentUserIdentity(activeConversation, currentUserId);
+    if (text) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          _id: clientId,
+          localId: clientId,
+          senderClerkId: currentUserId,
+          senderName: identity.name,
+          senderAvatar: identity.avatar,
+          recipientClerkId: otherPerson(activeConversation, currentUserId).id,
+          text,
+          attachments: [],
+          createdAt: new Date().toISOString(),
+          deliveryStatus: "sent",
+        },
+      ]);
+    }
     setDraft("");
     setPendingAttachments([]);
     setSending(true);
@@ -635,17 +720,36 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
         attachments.push(await uploadAttachment(attachmentsToUpload[index], index));
       }
 
-      setUploadProgress("Sending...");
       const result = await sendMessage({
         conversationId: activeConversation._id,
         text,
         attachments,
+        clientId,
       });
       const sentMessage = result.message as unknown as Message;
       upsertConversation(result.conversation as unknown as Conversation);
       setMessages((prev) => {
-        if (prev.some((message) => message._id === sentMessage._id)) return prev;
-        return [...prev, sentMessage];
+        const withoutLocal = prev.filter(
+          (message) => message.localId !== result.clientId && message._id !== result.clientId
+        );
+        if (withoutLocal.some((message) => message._id === sentMessage._id)) {
+          return withoutLocal.map((message) =>
+            message._id === sentMessage._id
+              ? {
+                  ...message,
+                  deliveredAt: sentMessage.deliveredAt ?? message.deliveredAt,
+                  deliveryStatus: "delivered",
+                }
+              : message
+          );
+        }
+        return [
+          ...withoutLocal,
+          {
+            ...sentMessage,
+            deliveryStatus: "delivered",
+          },
+        ];
       });
       attachmentsToUpload.forEach((attachment) => {
         if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
@@ -654,6 +758,7 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
       console.error(error);
       setDraft(text);
       setPendingAttachments(attachmentsToUpload);
+      setMessages((prev) => prev.filter((message) => message.localId !== clientId));
       alert(error instanceof Error ? error.message : "Message could not be sent. Please try again.");
     } finally {
       setSending(false);
@@ -823,6 +928,9 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
                 const hasAttachments = Boolean(message.attachments?.length);
                 const hasText = Boolean(message.text.trim());
                 if (!hasAttachments && !hasText) return null;
+                const status = message.deliveryStatus ?? deliveryStatusFor(message, currentUserId);
+                const showDoubleTick = isMine && status === "delivered";
+                const showSingleTick = isMine && status === "sent";
 
                 return (
                   <div key={message._id}>
@@ -851,9 +959,49 @@ export default function InboxClient({ currentUserId, initialConversations }: Pro
                           </div>
                         )}
                         {message.text.trim() && <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p>}
-                        <p className={`mt-1 text-right text-[10px] ${isMine ? "text-white/75" : "text-[#97a4b3]"}`}>
-                          {timeLabel(message.createdAt)}
-                        </p>
+                        <div className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${isMine ? "text-white/75" : "text-[#97a4b3]"}`}>
+                          <span>{timeLabel(message.createdAt)}</span>
+                          {showSingleTick && (
+                            <span className="inline-flex items-center text-white/70">
+                              <svg
+                                className="h-3.5 w-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            </span>
+                          )}
+                          {showDoubleTick && (
+                            <span className="inline-flex items-center text-white">
+                              <svg
+                                className="h-3.5 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M3 13l3 3L14 8"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M10 13l3 3L21 8"
+                                />
+                              </svg>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

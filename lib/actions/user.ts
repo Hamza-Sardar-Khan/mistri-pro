@@ -136,3 +136,175 @@ export async function saveProfileSetup(data: {
 
   return JSON.parse(JSON.stringify(dbUser));
 }
+
+export async function getUserSummariesByIds(clerkUserIds: string[]) {
+  if (clerkUserIds.length === 0) return [];
+  await connectDB();
+
+  const users = await User.find({ clerkUserId: { $in: clerkUserIds } })
+    .select("clerkUserId firstName lastName avatarUrl followers")
+    .lean();
+
+  return users.map((user) => ({
+    clerkUserId: user.clerkUserId,
+    name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Anonymous",
+    avatarUrl: user.avatarUrl ?? "",
+    followersCount: user.followers?.length ?? 0,
+  }));
+}
+
+export async function getTopUserSummaries(limit: number, excludeClerkUserId?: string) {
+  if (limit <= 0) return [];
+  await connectDB();
+
+  const matchStage = excludeClerkUserId
+    ? { clerkUserId: { $ne: excludeClerkUserId } }
+    : {};
+
+  const users = await User.aggregate([
+    { $match: matchStage },
+    { $addFields: { followersCount: { $size: { $ifNull: ["$followers", []] } } } },
+    { $sort: { followersCount: -1, createdAt: -1 } },
+    { $limit: limit },
+    {
+      $project: {
+        clerkUserId: 1,
+        firstName: 1,
+        lastName: 1,
+        avatarUrl: 1,
+        followersCount: 1,
+      },
+    },
+  ]);
+
+  return users.map((user) => ({
+    clerkUserId: user.clerkUserId,
+    name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Anonymous",
+    avatarUrl: user.avatarUrl ?? "",
+    followersCount: user.followersCount ?? 0,
+  }));
+}
+
+export async function getFollowStats(clerkUserId: string) {
+  await connectDB();
+  const user = await User.findOne({ clerkUserId }).select("followers following").lean();
+  if (!user) return { followersCount: 0, followingCount: 0 };
+
+  return {
+    followersCount: user.followers?.length ?? 0,
+    followingCount: user.following?.length ?? 0,
+  };
+}
+
+export async function getFollowState(targetClerkUserId: string) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) return { isFollowing: false };
+  if (clerkUser.id === targetClerkUserId) return { isFollowing: false };
+
+  await connectDB();
+  const user = await User.findOne({ clerkUserId: clerkUser.id })
+    .select("following")
+    .lean();
+
+  const isFollowing = Boolean(user?.following?.includes(targetClerkUserId));
+  return { isFollowing };
+}
+
+export async function getMyFollowingIds() {
+  const clerkUser = await currentUser();
+  if (!clerkUser) return [];
+
+  await connectDB();
+  const user = await User.findOne({ clerkUserId: clerkUser.id })
+    .select("following")
+    .lean();
+
+  return user?.following ?? [];
+}
+
+export async function followUser(targetClerkUserId: string) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Not authenticated");
+  if (clerkUser.id === targetClerkUserId) return { isFollowing: false, followersCount: 0 };
+
+  await connectDB();
+
+  await User.findOneAndUpdate(
+    { clerkUserId: clerkUser.id },
+    {
+      $setOnInsert: {
+        clerkUserId: clerkUser.id,
+        firstName: clerkUser.firstName ?? "",
+        lastName: clerkUser.lastName ?? "",
+        avatarUrl: clerkUser.imageUrl ?? "",
+      },
+    },
+    { upsert: true }
+  );
+
+  await User.findOneAndUpdate(
+    { clerkUserId: targetClerkUserId },
+    { $setOnInsert: { clerkUserId: targetClerkUserId } },
+    { upsert: true }
+  );
+
+  await User.findOneAndUpdate(
+    { clerkUserId: clerkUser.id },
+    { $addToSet: { following: targetClerkUserId } }
+  );
+
+  const target = await User.findOneAndUpdate(
+    { clerkUserId: targetClerkUserId },
+    { $addToSet: { followers: clerkUser.id } },
+    { new: true }
+  ).select("followers");
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/profile/${targetClerkUserId}`);
+  revalidatePath("/profile");
+
+  return {
+    isFollowing: true,
+    followersCount: target?.followers?.length ?? 0,
+  };
+}
+
+export async function unfollowUser(targetClerkUserId: string) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Not authenticated");
+  if (clerkUser.id === targetClerkUserId) return { isFollowing: false, followersCount: 0 };
+
+  await connectDB();
+
+  await User.findOneAndUpdate(
+    { clerkUserId: clerkUser.id },
+    { $setOnInsert: { clerkUserId: clerkUser.id } },
+    { upsert: true }
+  );
+
+  await User.findOneAndUpdate(
+    { clerkUserId: targetClerkUserId },
+    { $setOnInsert: { clerkUserId: targetClerkUserId } },
+    { upsert: true }
+  );
+
+  await User.findOneAndUpdate(
+    { clerkUserId: clerkUser.id },
+    { $pull: { following: targetClerkUserId } }
+  );
+
+  const target = await User.findOneAndUpdate(
+    { clerkUserId: targetClerkUserId },
+    { $pull: { followers: clerkUser.id } },
+    { new: true }
+  ).select("followers");
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/profile/${targetClerkUserId}`);
+  revalidatePath("/profile");
+
+  return {
+    isFollowing: false,
+    followersCount: target?.followers?.length ?? 0,
+  };
+}
