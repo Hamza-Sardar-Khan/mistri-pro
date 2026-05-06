@@ -53,5 +53,7 @@ next-env.d.ts
 # igonore the project proposal pdf
 Mistri-Pro.pdf
 
-# ignore the docs folder
-/docs/
+# ignore generated docs, except Task 3 testing deliverables
+/docs/*
+!/docs/Task3_Software_Testing.md
+!/docs/Task3_Testing_Summary_For_Presentation.md
